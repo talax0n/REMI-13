@@ -64,8 +64,11 @@ function LoginForm({
   const [errors, setErrors] = useState({ name: false, church: false });
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredNames, setFilteredNames] = useState<string[]>([]);
+  const [showChurchSuggestions, setShowChurchSuggestions] = useState(false);
+  const [filteredChurches, setFilteredChurches] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Filter names based on input
   useEffect(() => {
     if (name.trim()) {
       const filtered = availableParticipants.filter(p => 
@@ -79,6 +82,21 @@ function LoginForm({
     }
   }, [name, availableParticipants]);
 
+  // Filter churches based on input
+  useEffect(() => {
+    if (church.trim()) {
+      const filtered = churches.filter(c => 
+        c.toLowerCase().includes(church.toLowerCase()) && 
+        c.toLowerCase() !== church.toLowerCase()
+      ).slice(0, 5);
+      setFilteredChurches(filtered);
+      setShowChurchSuggestions(filtered.length > 0);
+    } else {
+      setShowChurchSuggestions(false);
+      setFilteredChurches([]);
+    }
+  }, [church, churches]);
+
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value);
     setErrors(prev => ({ ...prev, name: false }));
@@ -89,9 +107,21 @@ function LoginForm({
     setShowSuggestions(false);
   };
 
+  const handleChurchChange = (value: string) => {
+    setChurch(value);
+    setErrors(prev => ({ ...prev, church: false }));
+  };
+
+  const handleSelectChurch = (selectedChurch: string) => {
+    setChurch(selectedChurch);
+    setShowChurchSuggestions(false);
+    setErrors(prev => ({ ...prev, church: false }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setShowSuggestions(false);
+    setShowChurchSuggestions(false);
     const newErrors = {
       name: !name.trim(),
       church: !church.trim(),
@@ -190,34 +220,92 @@ function LoginForm({
                 )}
               </div>
 
-              {/* Church Selection */}
-              <div className="space-y-2">
+              {/* Church Selection with Search */}
+              <div className="space-y-2 relative">
                 <label className="text-sm font-medium text-zinc-300 flex items-center gap-2">
                   <Hash className="w-4 h-4 text-zinc-500" />
                   Your Church
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {churches.map((churchName) => {
-                    const isSelected = church === churchName;
-                    const churchStyle = getChurchStyle(churchName);
-                    return (
-                      <button
-                        key={churchName}
-                        type="button"
-                        onClick={() => setChurch(churchName)}
-                        className={`
-                          px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200
-                          ${isSelected 
-                            ? `${churchStyle.bg} ${churchStyle.text} ${churchStyle.border} border` 
-                            : 'bg-zinc-800/50 text-zinc-400 border border-transparent hover:bg-zinc-700/50'
-                          }
-                        `}
-                      >
-                        {churchName}
-                      </button>
-                    );
-                  })}
+                
+                {/* Church Input */}
+                <div className="relative">
+                  <Input
+                    type="text"
+                    value={church}
+                    onChange={(e) => handleChurchChange(e.target.value)}
+                    onFocus={() => church.trim() && filteredChurches.length > 0 && setShowChurchSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowChurchSuggestions(false), 200)}
+                    placeholder="Type or select your church..."
+                    autoComplete="off"
+                    className={`bg-zinc-800/50 border-white/10 text-white h-12 text-lg pr-10 ${
+                      errors.church ? 'border-red-500/50 focus:border-red-500' : ''
+                    }`}
+                  />
+                  <Hash className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 pointer-events-none" />
                 </div>
+                
+                {/* Church Search Suggestions */}
+                <AnimatePresence>
+                  {showChurchSuggestions && filteredChurches.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute z-50 left-0 right-0 top-full mt-1 bg-zinc-800 border border-white/10 rounded-lg shadow-xl overflow-hidden"
+                    >
+                      {filteredChurches.map((suggestion, index) => {
+                        const churchStyle = getChurchStyle(suggestion);
+                        return (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            onClick={() => handleSelectChurch(suggestion)}
+                            onMouseDown={(e) => e.preventDefault()}
+                            className={`
+                              w-full px-4 py-3 text-left text-white text-sm
+                              hover:bg-zinc-700/50 transition-colors flex items-center gap-3
+                              ${index !== filteredChurches.length - 1 ? 'border-b border-white/5' : ''}
+                            `}
+                          >
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${churchStyle.bg}`}>
+                              <Hash className={`w-4 h-4 ${churchStyle.text}`} />
+                            </div>
+                            <div className="flex-1">
+                              <span className="font-medium">{suggestion}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Quick Select Grid (shows when input is empty) */}
+                {!church && !showChurchSuggestions && (
+                  <div className="pt-2">
+                    <p className="text-xs text-zinc-500 mb-2">Quick select:</p>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {churches.slice(0, 8).map((churchName) => {
+                        const churchStyle = getChurchStyle(churchName);
+                        return (
+                          <button
+                            key={churchName}
+                            type="button"
+                            onClick={() => handleSelectChurch(churchName)}
+                            className={`
+                              px-2 py-2 rounded-lg text-xs font-medium transition-all duration-200
+                              ${churchStyle.bg} ${churchStyle.text} ${churchStyle.border} border
+                              hover:opacity-80
+                            `}
+                          >
+                            {churchName}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                
                 {errors.church && (
                   <p className="text-red-400 text-sm flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" />
