@@ -1,28 +1,28 @@
 export const dynamic = 'force-dynamic';
 
-import { getTables, subscribe } from '@/lib/tables-store';
+import { getTables } from '@/lib/tables-store';
 
 export async function GET() {
   const encoder = new TextEncoder();
-  let unsubscribe: (() => void) | undefined;
+  let cancelled = false;
 
   const stream = new ReadableStream({
     start(controller) {
-      // Send current tables immediately on connect
-      const current = getTables();
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify(current)}\n\n`));
-
-      // Push future updates
-      unsubscribe = subscribe((tables) => {
-        try {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(tables)}\n\n`));
-        } catch {
-          unsubscribe?.();
+      async function poll() {
+        while (!cancelled) {
+          try {
+            const data = await getTables();
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          } catch {
+            // ignore transient errors
+          }
+          await new Promise((r) => setTimeout(r, 2000));
         }
-      });
+      }
+      poll();
     },
     cancel() {
-      unsubscribe?.();
+      cancelled = true;
     },
   });
 

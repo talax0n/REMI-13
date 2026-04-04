@@ -12,12 +12,19 @@ import TableScoring from './components/TableScoring';
 import PlayerQRCode from './components/PlayerQRCode';
 import { Button } from '@/components/ui/button';
 import { AdminParticipant, TournamentState } from './types';
-import { QrCode } from 'lucide-react';
+import { QrCode, RotateCcw, SkipBack, Trash2, AlertTriangle } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Table, Player } from '../components/types';
-import { participants as initialParticipants } from '../components/participants';
 import {
   generateTables as engineGenerateTables,
   updateOpponents,
+  generateTablesCompat,
   Participant as EngineParticipant,
 } from '@/lib/shuffle-engine';
 
@@ -47,24 +54,6 @@ function buildTablesFromParticipants(parts: AdminParticipant[]): Table[] {
     }));
 }
 
-// Generate initial admin participants from the data
-function generateInitialParticipants(): AdminParticipant[] {
-  let activeIndex = 0;
-  return initialParticipants.map((p, index) => {
-    const tableNumber = p.active ? Math.floor(activeIndex / 5) + 1 : undefined;
-    if (p.active) activeIndex++;
-    return {
-      id: `participant-${index}`,
-      name: p.name,
-      church: p.church,
-      score: Math.floor(Math.random() * 5000) + 5000,
-      matchesPlayed: Math.floor(Math.random() * 10),
-      status: p.active ? 'active' : 'eliminated',
-      tableNumber,
-    };
-  });
-}
-
 // Extract unique churches
 function extractChurches(participants: AdminParticipant[]): string[] {
   return Array.from(new Set(participants.map((p) => p.church))).sort();
@@ -73,18 +62,34 @@ function extractChurches(participants: AdminParticipant[]): string[] {
 type TabType = 'participants' | 'scoring';
 
 export default function AdminPage() {
-  const [participants, setParticipants] = useState<AdminParticipant[]>(generateInitialParticipants());
+  const [participants, setParticipants] = useState<AdminParticipant[]>([]);
   const [tournamentState, setTournamentState] = useState<TournamentState>({
     phase: 1,
     status: 'waiting',
-    totalParticipants: initialParticipants.length,
-    totalTables: Math.ceil(initialParticipants.filter(p => p.active).length / 5),
+    totalParticipants: 0,
+    totalTables: 0,
     maxPhases: 5,
   });
   const [activeTab, setActiveTab] = useState<TabType>('participants');
   const [showQRCode, setShowQRCode] = useState(false);
+  const [showResetWarning, setShowResetWarning] = useState(false);
+  const [showPhaseBackWarning, setShowPhaseBackWarning] = useState(false);
+  const [showResetAllScoresWarning, setShowResetAllScoresWarning] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const churches = useMemo(() => extractChurches(participants), [participants]);
+
+  // Load state from DB on mount
+  useEffect(() => {
+    fetch('/api/admin')
+      .then((r) => r.json())
+      .then((data) => {
+        setParticipants(data.participants);
+        setTournamentState(data.tournamentState);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
   // Update tournament stats
   const updateTournamentStats = useCallback(() => {
@@ -144,7 +149,8 @@ export default function AdminPage() {
     let tableGroups: EngineParticipant[][];
 
     try {
-      tableGroups = engineGenerateTables(engineParticipants).tables;
+      const shuffleResult = engineGenerateTables(engineParticipants);
+      tableGroups = shuffleResult.tables;
       // Record new opponents so future rounds respect prior matchups
       updateOpponents(tableGroups);
     } catch {
@@ -179,12 +185,53 @@ export default function AdminPage() {
 
   // Complete phase and advance
   const handlePhaseComplete = useCallback(() => {
-    setTournamentState((prev) => ({
-      ...prev,
-      phase: Math.min(prev.phase + 1, prev.maxPhases),
-      status: prev.phase + 1 >= prev.maxPhases ? 'completed' : 'waiting',
-    }));
+    setTournamentState((prev) => {
+      const next = {
+        ...prev,
+        phase: Math.min(prev.phase + 1, prev.maxPhases),
+        status: (prev.phase + 1 >= prev.maxPhases ? 'completed' : 'waiting') as TournamentState['status'],
+      };
+      fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phase: next.phase, status: next.status, maxPhases: next.maxPhases }),
+      }).catch(console.error);
+      return next;
+    });
   }, []);
+
+  // Go back to previous phase
+  const handlePhaseBack = useCallback(() => {
+    setTournamentState((prev) => {
+      const next = {
+        ...prev,
+        phase: Math.max(1, prev.phase - 1),
+        status: 'waiting' as TournamentState['status'],
+      };
+      fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phase: next.phase, status: next.status, maxPhases: next.maxPhases }),
+      }).catch(console.error);
+      return next;
+    });
+    setShowPhaseBackWarning(false);
+  }, []);
+
+  // Reset all scores (set all participant scores to 0)
+  const handleResetAllScores = useCallback(async () => {
+    setParticipants((prev) =>
+      prev.map((p) => ({ ...p, score: 0, matchesPlayed: 0 }))
+    );
+    // Clear phase scores via API
+    await fetch('/api/player', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resetScores: true }),
+    }).catch(console.error);
+    updateTournamentStats();
+    setShowResetAllScoresWarning(false);
+  }, [updateTournamentStats]);
 
   // Delete participant
   const handleDeleteParticipant = useCallback(async (id: string) => {
@@ -202,13 +249,13 @@ export default function AdminPage() {
     updateTournamentStats();
   }, [updateTournamentStats]);
 
-  // Save scores from table scoring
-  const handleSaveScores = useCallback(async (updates: { id: string; score: number }[]) => {
+  // Save scores from table scoring with phase tracking
+  const handleSaveScores = useCallback(async (updates: { id: string; score: number; phase: number }[]) => {
     const phaseUpdates = updates.map((u) => {
       const participant = participants.find((p) => p.id === u.id);
       return {
         id: u.id,
-        phase: tournamentState.phase,
+        phase: u.phase,
         points: u.score,
         tableNumber: participant?.tableNumber,
       };
@@ -232,7 +279,7 @@ export default function AdminPage() {
       })
     );
     updateTournamentStats();
-  }, [participants, tournamentState.phase, updateTournamentStats]);
+  }, [participants, updateTournamentStats]);
 
   // Sync participants to player store and push tables to display whenever participants change
   useEffect(() => {
@@ -259,6 +306,14 @@ export default function AdminPage() {
     };
     sync();
   }, [participants]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0B0F1A] flex items-center justify-center">
+        <p className="text-zinc-500">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0B0F1A]">
@@ -305,11 +360,30 @@ export default function AdminPage() {
                 <QrCode className="w-4 h-4 mr-2" />
                 Player QR
               </Button>
-              <div className="text-right">
-                <p className="text-sm text-zinc-500">Phase</p>
-                <p className="text-lg font-bold text-white">
-                  {tournamentState.phase} <span className="text-zinc-500">/ {tournamentState.maxPhases}</span>
-                </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowPhaseBackWarning(true)}
+                  disabled={tournamentState.phase === 1}
+                  className="border-white/10 text-white hover:bg-white/10 disabled:opacity-30"
+                >
+                  <SkipBack className="w-4 h-4" />
+                </Button>
+                <div className="text-right">
+                  <p className="text-sm text-zinc-500">Phase</p>
+                  <p className="text-lg font-bold text-white">
+                    {tournamentState.phase} <span className="text-zinc-500">/ {tournamentState.maxPhases}</span>
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowResetAllScoresWarning(true)}
+                  className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
             </motion.div>
           </div>
@@ -377,7 +451,7 @@ export default function AdminPage() {
             </div>
           ) : (
             <TableScoring
-              participants={participants}
+              currentPhase={tournamentState.phase}
               onSaveScores={handleSaveScores}
             />
           )}
@@ -389,6 +463,79 @@ export default function AdminPage() {
         isOpen={showQRCode} 
         onClose={() => setShowQRCode(false)} 
       />
+
+      {/* Phase Back Warning Dialog */}
+      <Dialog open={showPhaseBackWarning} onOpenChange={setShowPhaseBackWarning}>
+        <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <AlertTriangle className="w-6 h-6 text-yellow-500" />
+              Go Back to Previous Phase?
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400 pt-2">
+              You are about to go back from Phase {tournamentState.phase} to Phase {tournamentState.phase - 1}.
+              <br /><br />
+              <span className="text-yellow-400 font-medium">Warning:</span> This action should only be used if you made a mistake. Players may have already seen scores for the current phase.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowPhaseBackWarning(false)}
+              className="flex-1 border-white/10 text-white hover:bg-white/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handlePhaseBack}
+              className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-white"
+            >
+              <SkipBack className="w-4 h-4 mr-2" />
+              Go Back
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset All Scores Warning Dialog */}
+      <Dialog open={showResetAllScoresWarning} onOpenChange={setShowResetAllScoresWarning}>
+        <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <AlertTriangle className="w-6 h-6 text-red-500" />
+              Reset All Scores?
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400 pt-2">
+              You are about to reset <strong>ALL</strong> participant scores to zero.
+              <br /><br />
+              <span className="text-red-400 font-medium">This will:</span>
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Clear all cumulative scores</li>
+                <li>Delete all phase score history</li>
+                <li>Reset the leaderboard</li>
+              </ul>
+              <br />
+              <span className="text-red-400 font-bold">This action cannot be undone!</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowResetAllScoresWarning(false)}
+              className="flex-1 border-white/10 text-white hover:bg-white/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleResetAllScores}
+              className="flex-1 bg-red-600 hover:bg-red-500 text-white"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Reset All
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
