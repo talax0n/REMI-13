@@ -1,19 +1,19 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Users, Maximize2, Minimize2 } from 'lucide-react';
-import LeaderboardScreen from './LeaderboardScreen';
-import TablesScreen from './TablesScreen';
-import { ScreenType, Player, Table } from './types';
-import { participants } from './participants';
+import { useState, useEffect, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Trophy, Users, Maximize2, Minimize2 } from "lucide-react";
+import LeaderboardScreen from "./LeaderboardScreen";
+import TablesScreen from "./TablesScreen";
+import { ScreenType, Player, Table } from "./types";
+import { participants } from "./participants";
 
 // Generate players from ALL participant data (not just active ones)
 function generatePlayersFromParticipants(): Player[] {
   return participants
     .map((p, index) => {
       // Generate realistic scores (deterministic based on index)
-      const baseScore = 10000 - (index * 95);
+      const baseScore = 10000 - index * 95;
       const variance = (index * 37) % 300; // deterministic variance
       return {
         id: `player-${index}`,
@@ -21,40 +21,52 @@ function generatePlayersFromParticipants(): Player[] {
         church: p.church,
         score: baseScore + variance,
         rank: index + 1,
-        status: (p.active ? 'active' : 'eliminated') as Player['status'],
+        status: (p.active ? "active" : "eliminated") as Player["status"],
       };
     })
     .sort((a, b) => b.score - a.score)
     .map((p, index) => ({ ...p, rank: index + 1 }));
 }
 
-// Generate tables (5 players per table)
+// Generate tables from active players only, 5 per table
 function generateTables(players: Player[]): Table[] {
+  const active = players.filter((p) => p.status === "active");
   const tables: Table[] = [];
-  for (let i = 0; i < players.length; i += 5) {
-    const tablePlayers = players.slice(i, i + 5);
-    tables.push({
-      id: `table-${i / 5}`,
-      number: (i / 5) + 1,
-      players: tablePlayers,
-    });
+  for (let i = 0; i < active.length; i += 5) {
+    const tablePlayers = active.slice(i, i + 5);
+    if (tablePlayers.length === 5) {
+      tables.push({
+        id: `table-${i / 5}`,
+        number: i / 5 + 1,
+        players: tablePlayers,
+      });
+    }
   }
+  console.log(tables);
   return tables;
 }
 
 export default function ScreenController() {
-  const [currentScreen, setCurrentScreen] = useState<ScreenType>('leaderboard');
+  const [currentScreen, setCurrentScreen] = useState<ScreenType>("leaderboard");
   const [isFullscreen, setIsFullscreen] = useState(false);
-  
-  const players = useMemo(() => generatePlayersFromParticipants(), []);
-  const tables = useMemo(() => generateTables(players), [players]);
 
-  // Simulate live score updates
+  const players = useMemo(() => generatePlayersFromParticipants(), []);
+  const [tables, setTables] = useState<Table[]>(() => generateTables(players));
+
+  // Subscribe to real-time table updates via SSE
   useEffect(() => {
-    const interval = setInterval(() => {
-      // This would update scores in a real app
-    }, 5000);
-    return () => clearInterval(interval);
+    const es = new EventSource("/api/tables/stream");
+    es.onmessage = (e) => {
+      try {
+        const data: Table[] = JSON.parse(e.data);
+        if (Array.isArray(data) && data.length > 0) {
+          setTables(data);
+        }
+      } catch {
+        // ignore malformed events
+      }
+    };
+    return () => es.close();
   }, []);
 
   const toggleFullscreen = () => {
@@ -68,8 +80,8 @@ export default function ScreenController() {
   };
 
   const navItems = [
-    { id: 'leaderboard' as ScreenType, label: 'Leaderboard', icon: Trophy },
-    { id: 'tables' as ScreenType, label: 'Tables', icon: Users },
+    { id: "leaderboard" as ScreenType, label: "Leaderboard", icon: Trophy },
+    { id: "tables" as ScreenType, label: "Tables", icon: Users },
   ];
 
   return (
@@ -81,9 +93,9 @@ export default function ScreenController() {
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-500 to-yellow-600 flex items-center justify-center">
             <Trophy className="w-4 h-4 text-yellow-950" />
           </div>
-          <span 
+          <span
             className="text-lg font-bold text-white"
-            style={{ fontFamily: 'var(--font-space-grotesk), sans-serif' }}
+            style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
           >
             Remi 13
           </span>
@@ -94,16 +106,17 @@ export default function ScreenController() {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentScreen === item.id;
-            
+
             return (
               <button
                 key={item.id}
                 onClick={() => setCurrentScreen(item.id)}
                 className={`
                   flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
-                  ${isActive 
-                    ? 'bg-white text-black' 
-                    : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                  ${
+                    isActive
+                      ? "bg-white text-black"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
                   }
                 `}
               >
@@ -136,7 +149,7 @@ export default function ScreenController() {
       {/* Screen Content */}
       <main className="flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
-          {currentScreen === 'leaderboard' && (
+          {currentScreen === "leaderboard" && (
             <motion.div
               key="leaderboard"
               initial={{ opacity: 0, y: 10 }}
@@ -148,7 +161,7 @@ export default function ScreenController() {
               <LeaderboardScreen players={players} />
             </motion.div>
           )}
-          {currentScreen === 'tables' && (
+          {currentScreen === "tables" && (
             <motion.div
               key="tables"
               initial={{ opacity: 0, y: 10 }}

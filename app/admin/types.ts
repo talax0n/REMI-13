@@ -5,6 +5,7 @@ export interface AdminParticipant {
   score: number;
   matchesPlayed: number;
   tableNumber?: number;
+  opponents?: string[];
   status: 'active' | 'eliminated' | 'winner';
 }
 

@@ -1,0 +1,390 @@
+'use client';
+
+import { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
+import { Search, Filter, Users, ChevronUp, ChevronDown, Trash2, Edit2, CheckCircle2, XCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import { AdminParticipant } from '../types';
+import { churchColors, defaultChurchColor } from '../../components/participants';
+
+interface ParticipantTableProps {
+  participants: AdminParticipant[];
+  churches: string[];
+  isLoading?: boolean;
+  onDelete?: (id: string) => Promise<void>;
+  onEdit?: (participant: AdminParticipant) => void;
+  onToggleActive?: (id: string, active: boolean) => Promise<void>;
+}
+
+type SortField = 'name' | 'church' | 'score' | 'matchesPlayed' | 'status';
+type SortDirection = 'asc' | 'desc';
+
+function getChurchStyle(church: string) {
+  return churchColors[church] || defaultChurchColor;
+}
+
+// Stats Card Component
+function StatsCard({ 
+  title, 
+  count, 
+  icon: Icon, 
+  colorClass 
+}: { 
+  title: string; 
+  count: number; 
+  icon: React.ElementType;
+  colorClass: string;
+}) {
+  return (
+    <div className="bg-zinc-800/50 rounded-lg p-4 border border-white/5">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-zinc-500 uppercase tracking-wider">{title}</p>
+          <p className={`text-2xl font-bold ${colorClass}`}>{count}</p>
+        </div>
+        <Icon className={`w-8 h-8 ${colorClass} opacity-50`} />
+      </div>
+    </div>
+  );
+}
+
+export default function ParticipantTable({
+  participants,
+  churches,
+  isLoading = false,
+  onDelete,
+  onEdit,
+  onToggleActive,
+}: ParticipantTableProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [churchFilter, setChurchFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sortField, setSortField] = useState<SortField>('score');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    const active = participants.filter(p => p.status === 'active').length;
+    const inactive = participants.filter(p => p.status !== 'active').length;
+    return { active, inactive, total: participants.length };
+  }, [participants]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const filteredParticipants = useMemo(() => {
+    let result = [...participants];
+
+    // Filter by search
+    if (searchQuery) {
+      result = result.filter((p) =>
+        p.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Filter by church
+    if (churchFilter && churchFilter !== 'all') {
+      result = result.filter((p) => p.church === churchFilter);
+    }
+
+    // Filter by status
+    if (statusFilter && statusFilter !== 'all') {
+      result = result.filter((p) => 
+        statusFilter === 'active' ? p.status === 'active' : p.status !== 'active'
+      );
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'church':
+          comparison = a.church.localeCompare(b.church);
+          break;
+        case 'score':
+          comparison = a.score - b.score;
+          break;
+        case 'matchesPlayed':
+          comparison = a.matchesPlayed - b.matchesPlayed;
+          break;
+        case 'status':
+          comparison = (a.status === 'active' ? 1 : 0) - (b.status === 'active' ? 1 : 0);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return result;
+  }, [participants, searchQuery, churchFilter, statusFilter, sortField, sortDirection]);
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return null;
+    return sortDirection === 'asc' ? (
+      <ChevronUp className="w-4 h-4 ml-1" />
+    ) : (
+      <ChevronDown className="w-4 h-4 ml-1" />
+    );
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: 0.4 }}
+    >
+      <Card className="bg-zinc-900/50 border-white/10">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-white">
+            <Users className="w-5 h-5 text-cyan-500" />
+            Participants
+            <Badge variant="secondary" className="bg-zinc-800 text-zinc-300">
+              {filteredParticipants.length}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-3 gap-3">
+            <StatsCard
+              title="Total"
+              count={stats.total}
+              icon={Users}
+              colorClass="text-blue-400"
+            />
+            <StatsCard
+              title="Active (Paid)"
+              count={stats.active}
+              icon={CheckCircle2}
+              colorClass="text-emerald-400"
+            />
+            <StatsCard
+              title="Inactive (Unpaid)"
+              count={stats.inactive}
+              icon={XCircle}
+              colorClass="text-rose-400"
+            />
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <Input
+                placeholder="Search by name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 bg-zinc-800/50 border-white/10 text-white placeholder:text-zinc-500"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-zinc-500" />
+              <Select value={churchFilter} onValueChange={setChurchFilter}>
+                <SelectTrigger className="w-[140px] bg-zinc-800/50 border-white/10 text-white">
+                  <SelectValue placeholder="Church" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-800 border-white/10">
+                  <SelectItem value="all" className="text-white hover:bg-zinc-700">
+                    All Churches
+                  </SelectItem>
+                  {churches.map((c) => (
+                    <SelectItem
+                      key={c}
+                      value={c}
+                      className="text-white hover:bg-zinc-700"
+                    >
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[140px] bg-zinc-800/50 border-white/10 text-white">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-800 border-white/10">
+                  <SelectItem value="all" className="text-white hover:bg-zinc-700">
+                    All Status
+                  </SelectItem>
+                  <SelectItem value="active" className="text-white hover:bg-zinc-700">
+                    Active (Paid)
+                  </SelectItem>
+                  <SelectItem value="inactive" className="text-white hover:bg-zinc-700">
+                    Inactive (Unpaid)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="border border-white/10 rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader className="bg-zinc-800">
+                <TableRow className="border-white/10 hover:bg-transparent">
+                  <TableHead
+                    className="text-zinc-300 cursor-pointer hover:text-white"
+                    onClick={() => handleSort('name')}
+                  >
+                    <div className="flex items-center">
+                      Name
+                      <SortIcon field="name" />
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-zinc-300 cursor-pointer hover:text-white"
+                    onClick={() => handleSort('church')}
+                  >
+                    <div className="flex items-center">
+                      Church
+                      <SortIcon field="church" />
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-zinc-300 cursor-pointer hover:text-white text-right"
+                    onClick={() => handleSort('score')}
+                  >
+                    <div className="flex items-center justify-end">
+                      Score
+                      <SortIcon field="score" />
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-zinc-300 cursor-pointer hover:text-white text-right"
+                    onClick={() => handleSort('matchesPlayed')}
+                  >
+                    <div className="flex items-center justify-end">
+                      Matches
+                      <SortIcon field="matchesPlayed" />
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="text-zinc-300 cursor-pointer hover:text-white text-center"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center justify-center">
+                      Paid
+                      <SortIcon field="status" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-zinc-300 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i} className="border-white/5">
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-20" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredParticipants.length === 0 ? (
+                  <TableRow className="border-white/5">
+                    <TableCell colSpan={6} className="text-center py-8 text-zinc-500">
+                      No participants found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredParticipants.map((participant) => {
+                    const churchStyle = getChurchStyle(participant.church);
+                    const isActive = participant.status === 'active';
+                    return (
+                      <TableRow
+                        key={participant.id}
+                        className="border-white/5 hover:bg-white/[0.02]"
+                      >
+                        <TableCell className="font-medium text-white">
+                          {participant.name}
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${churchStyle.bg} ${churchStyle.text}`}
+                          >
+                            {participant.church}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-white">
+                          {participant.score.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right text-zinc-400">
+                          {participant.matchesPlayed}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center">
+                            <Switch
+                              checked={isActive}
+                              onCheckedChange={(checked: boolean) => 
+                                onToggleActive?.(participant.id, checked)
+                              }
+                              className="data-[state=checked]:bg-emerald-500"
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {onEdit && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onEdit(participant)}
+                                className="h-8 w-8 text-zinc-400 hover:text-white"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {onDelete && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onDelete(participant.id)}
+                                className="h-8 w-8 text-zinc-400 hover:text-red-400"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}

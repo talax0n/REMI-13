@@ -1,0 +1,24 @@
+export interface PhaseScore {
+  points: number;
+  tableNumber?: number;
+  timestamp: string;
+}
+
+export interface PlayerScore {
+  id: string;
+  name: string;
+  church: string;
+  scores: Record<number, PhaseScore>; // phase number -> score
+  totalScore: number;
+  status: 'active' | 'eliminated' | 'winner';
+  currentPhase?: number;
+  currentTable?: number;
+  rank?: number;
+}
+
+export type PlayerView = 'login' | 'loading' | 'profile' | 'not-found';
+
+export interface LoginFormData {
+  name: string;
+  church: string;
+}
