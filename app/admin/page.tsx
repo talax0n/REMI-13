@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Toaster } from 'sonner';
 import ShuffleControl from './components/ShuffleControl';
@@ -76,6 +76,10 @@ export default function AdminPage() {
   const [showPhaseBackWarning, setShowPhaseBackWarning] = useState(false);
   const [showResetAllScoresWarning, setShowResetAllScoresWarning] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Tracks whether the initial DB load has been applied.
+  // The sync useEffect must not fire for that first setParticipants call —
+  // the DB already has correct state; syncing would unnecessarily overwrite tables.
+  const syncEnabled = useRef(false);
 
   const churches = useMemo(() => extractChurches(participants), [participants]);
 
@@ -86,6 +90,11 @@ export default function AdminPage() {
       .then((data) => {
         setParticipants(data.participants);
         setTournamentState(data.tournamentState);
+        // Enable syncing only AFTER the initial load settles.
+        // requestAnimationFrame ensures the participants useEffect triggered by
+        // setParticipants above has already fired (and been skipped) before we
+        // flip the flag, so the very next user-driven change triggers a sync.
+        requestAnimationFrame(() => { syncEnabled.current = true; });
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -249,40 +258,63 @@ export default function AdminPage() {
     updateTournamentStats();
   }, [updateTournamentStats]);
 
+  // Track previous phase scores to calculate differences when updating
+  const [phaseScores, setPhaseScores] = useState<Record<string, Record<number, number>>>({});
+
   // Save scores from table scoring with phase tracking
   const handleSaveScores = useCallback(async (updates: { id: string; score: number; phase: number }[]) => {
     const phaseUpdates = updates.map((u) => {
       const participant = participants.find((p) => p.id === u.id);
+      // Calculate the actual change: new score - previous score for this phase
+      const previousScore = phaseScores[u.id]?.[u.phase] ?? 0;
+      const scoreChange = u.score - previousScore;
+      
       return {
         id: u.id,
         phase: u.phase,
-        points: u.score,
+        points: u.score, // Store the actual score, not the change
         tableNumber: participant?.tableNumber,
       };
     });
 
     // 1. Record per-phase history first so the player detail view is consistent
-    //    before the leaderboard totalScore propagates via the useEffect sync.
     await fetch('/api/player', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phaseUpdates }),
     }).catch(console.error);
 
-    // 2. Update cumulative scores in admin state.
-    //    The useEffect will pick this up and push ap.score → totalScore via
-    //    syncFromAdminParticipants, updating the leaderboard in real-time.
+    // 2. Update cumulative scores in admin state using the calculated change
     setParticipants((prev) =>
       prev.map((p) => {
         const update = updates.find((u) => u.id === p.id);
-        return update ? { ...p, score: p.score + update.score } : p;
+        if (!update) return p;
+        
+        // Calculate the change from previous score for this phase
+        const previousScore = phaseScores[update.id]?.[update.phase] ?? 0;
+        const scoreChange = update.score - previousScore;
+        
+        return { ...p, score: p.score + scoreChange };
       })
     );
+    
+    // 3. Update phase scores tracking
+    setPhaseScores((prev) => {
+      const next = { ...prev };
+      updates.forEach((u) => {
+        if (!next[u.id]) next[u.id] = {};
+        next[u.id][u.phase] = u.score;
+      });
+      return next;
+    });
+    
     updateTournamentStats();
-  }, [participants, updateTournamentStats]);
+  }, [participants, phaseScores, updateTournamentStats]);
 
-  // Sync participants to player store and push tables to display whenever participants change
+  // Sync participants to player store and push tables to display whenever participants change.
+  // Skipped for the initial DB load (syncEnabled is false at that point).
   useEffect(() => {
+    if (!syncEnabled.current) return;
     const sync = async () => {
       const tables = buildTablesFromParticipants(participants);
       const fetches: Promise<unknown>[] = [

@@ -127,29 +127,77 @@ function repeatPairs(table: Participant[]): number {
 }
 
 // ---------------------------------------------------------------------------
-// Phase 1 — Per-church sequential assignment (PROVABLY OPTIMAL)
+// Phase 1 — Per-church sequential assignment + size rebalancing
 // ---------------------------------------------------------------------------
 
 /**
- * Assigns participants to tables guaranteeing the minimum possible
- * same-church concentration: at most ceil(churchSize / numTables) per table.
+ * Computes target table sizes: first numFull tables get TABLE_SIZE each,
+ * the last gets the remainder (if N % TABLE_SIZE != 0).
+ * Full tables come first so hill-climbing can slice them by index.
+ */
+function computeTargetSizes(N: number): number[] {
+  const numFull = Math.floor(N / TABLE_SIZE);
+  const remainder = N % TABLE_SIZE;
+  return [...Array(numFull).fill(TABLE_SIZE), ...(remainder > 0 ? [remainder] : [])];
+}
+
+/**
+ * Moves participants between tables until every table matches its target size.
  *
- * For each church independently:
- *   member[k] -> table[ (k + randomOffset) % numTables ]
+ * When choosing which participant to move from an over-full table, we score
+ * each candidate:
+ *   +2 if their church appears ≥2 times at the source (redundant — good to move)
+ *   +1 if their church does NOT appear at the destination (won't create a new pair)
+ * This keeps church distribution as close to optimal as possible after rebalancing.
+ */
+function rebalanceSizes(tables: Participant[][], targetSizes: number[]): void {
+  for (let round = 0; round < tables.length * TABLE_SIZE; round++) {
+    const srcIdx = tables.findIndex((t, i) => t.length > targetSizes[i]);
+    if (srcIdx === -1) break;
+    const dstIdx = tables.findIndex((t, i) => t.length < targetSizes[i]);
+    if (dstIdx === -1) break;
+
+    const src = tables[srcIdx];
+    const dst = tables[dstIdx];
+    const dstChurches = new Set(dst.map((p) => p.church));
+
+    const srcCounts = new Map<string, number>();
+    for (const p of src) srcCounts.set(p.church, (srcCounts.get(p.church) ?? 0) + 1);
+
+    let bestScore = -Infinity;
+    let bestIdx = 0;
+    for (let k = 0; k < src.length; k++) {
+      const c = src[k].church;
+      const score =
+        ((srcCounts.get(c) ?? 0) >= 2 ? 2 : 0) + (dstChurches.has(c) ? 0 : 1);
+      if (score > bestScore) { bestScore = score; bestIdx = k; }
+    }
+
+    const [moved] = src.splice(bestIdx, 1);
+    dst.push(moved);
+  }
+}
+
+/**
+ * Phase 1: Assigns participants to tables guaranteeing:
+ *   1. Each table has EXACTLY the target size (TABLE_SIZE, or remainder for the last).
+ *   2. Same-church concentration is at most ceil(churchSize / numTables) per table.
  *
- * The random offset (different per church, different per run) randomises
- * WHICH tables carry the overflow members without breaking the ceiling.
- * Within each church the members are pre-shuffled, so the specific
- * participant placed at each table is also random.
- *
- * After all churches are assigned, each table is shuffled so seat
- * positions within a table are random.
+ * Algorithm:
+ *   a) Per-church round-robin with random offset — minimises church concentration.
+ *   b) Size rebalancing — moves participants between over/under-full tables to hit
+ *      exact target sizes, preferring moves that preserve church separation.
+ *   c) Partial table (if any) is sorted to the last position so hill-climbing
+ *      can safely exclude it by index.
  */
 function perChurchSeed(
   participants: Participant[],
   numTables: number,
   rng: () => number,
 ): Participant[][] {
+  const N = participants.length;
+  const targetSizes = computeTargetSizes(N);
+
   // Group by church
   const byChurch = new Map<string, Participant[]>();
   for (const p of participants) {
@@ -160,16 +208,22 @@ function perChurchSeed(
   const tables: Participant[][] = Array.from({ length: numTables }, () => []);
 
   for (const members of byChurch.values()) {
-    // Shuffle within church: which member lands at which table is random
     const shuffled = fisherYatesShuffle(members, rng);
-    // Random offset: which table gets the first member (and thus the overflow)
     const offset = Math.floor(rng() * numTables);
     shuffled.forEach((p, k) => {
       tables[(k + offset) % numTables].push(p);
     });
   }
 
-  // Shuffle within each table so seat positions don't cluster by church
+  // Guarantee exact table sizes — fix any imbalance from independent per-church assignment
+  rebalanceSizes(tables, targetSizes);
+
+  // Sort so partial table (if any) is last, keeping it out of hill-climbing slice
+  if (N % TABLE_SIZE !== 0) {
+    tables.sort((a, b) => b.length - a.length);
+  }
+
+  // Shuffle within each table so seat order is random
   return tables.map((t) => fisherYatesShuffle(t, rng));
 }
 
@@ -178,14 +232,21 @@ function perChurchSeed(
 // ---------------------------------------------------------------------------
 
 /**
- * Reduces repeat-opponent meetings via randomised hill-climbing.
+ * Reduces church-pair violations AND repeat-opponent meetings via randomised
+ * hill-climbing.
  *
- * INVARIANT: a swap is accepted ONLY when it does not increase church pairs
- * at either affected table. Church optimality from Phase 1 is never worsened.
+ * Accept rule (priority order, church is NEVER allowed to get worse):
+ *   1. Church strictly improves (and repeats don't worsen)  → accept
+ *   2. Church stays same AND repeats strictly improve        → accept
+ *   3. Anything else                                         → revert
  *
- * Pre-computes per-table violation counts so each iteration is O(tableSize^2)
- * rather than O(N^2).
+ * This fixes a key Phase-1 gap: when there are no prior opponents
+ * (totalRepeats = 0) the old code exited immediately, leaving avoidable
+ * church-pair concentrations (e.g. table with 2 Agape + 2 DS) unfixed.
+ * Now hill-climbing also eliminates avoidable church violations even in
+ * Phase 1, where repeat history plays no role yet.
  *
+ * Pre-computes per-table counts so each iteration is O(tableSize²).
  * Returns final total repeat violations remaining.
  */
 function hillClimb(
@@ -198,8 +259,9 @@ function hillClimb(
   const chCount = tables.map(churchPairs);
   const repCount = tables.map(repeatPairs);
   let totalRepeats = repCount.reduce((s, v) => s + v, 0);
+  let totalChurch = chCount.reduce((s, v) => s + v, 0);
 
-  for (let iter = 0; iter < maxIter && totalRepeats > 0; iter++) {
+  for (let iter = 0; iter < maxIter && (totalChurch > 0 || totalRepeats > 0); iter++) {
     const ti = Math.floor(rng() * numTables);
     let tj = Math.floor(rng() * numTables);
     while (tj === ti) tj = Math.floor(rng() * numTables);
@@ -223,13 +285,17 @@ function hillClimb(
     const newCh = newChI + newChJ;
     const newRep = newRepI + newRepJ;
 
-    // Accept: church no worse AND repeats strictly improved
-    if (newCh <= oldCh && newRep < oldRep) {
+    // Accept: church never worsens, AND at least one metric strictly improves
+    const churchOk = newCh <= oldCh;
+    const somethingImproved = newCh < oldCh || newRep < oldRep;
+
+    if (churchOk && somethingImproved) {
       chCount[ti] = newChI;
       chCount[tj] = newChJ;
       repCount[ti] = newRepI;
       repCount[tj] = newRepJ;
       totalRepeats += newRep - oldRep;
+      totalChurch += newCh - oldCh;
     } else {
       // Revert
       tables[tj][pj] = tables[ti][pi];

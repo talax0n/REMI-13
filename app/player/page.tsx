@@ -523,8 +523,8 @@ function PlayerProfile({
                     <div className="text-right">
                       {isCompleted ? (
                         <>
-                          <p className="text-lg font-bold text-emerald-400">
-                            +{phaseData.points.toLocaleString()}
+                          <p className={`text-lg font-bold ${phaseData.points < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                            {phaseData.points < 0 ? '' : '+'}{phaseData.points.toLocaleString()}
                           </p>
                           <p className="text-xs text-zinc-500">
                             {new Date(phaseData.timestamp).toLocaleDateString()}

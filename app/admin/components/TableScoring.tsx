@@ -62,6 +62,22 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
     setHasChanges(true);
   };
 
+  // Subscribe to live score updates via EventSource
+  useEffect(() => {
+    const es = new EventSource('/api/player/stream');
+    es.onmessage = (e) => {
+      try {
+        const players: PlayerScore[] = JSON.parse(e.data);
+        const scoreMap = new Map<string, number>();
+        players.forEach((p) => scoreMap.set(p.id, p.totalScore));
+        setPlayerScores(scoreMap);
+      } catch {
+        // ignore malformed events
+      }
+    };
+    return () => es.close();
+  }, []);
+
   const handleSave = async () => {
     if (!hasChanges) {
       toast.info('No changes to save');
@@ -79,7 +95,7 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
       toast.success('Scores saved');
       setHasChanges(false);
       setScores({});
-      await fetchData();
+      // Note: fetchData() is no longer needed here since EventSource updates scores in real-time
     } catch {
       toast.error('Failed to save scores');
     } finally {
