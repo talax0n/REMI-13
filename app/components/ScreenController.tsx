@@ -34,13 +34,11 @@ function generateTables(players: Player[]): Table[] {
   const tables: Table[] = [];
   for (let i = 0; i < active.length; i += 5) {
     const tablePlayers = active.slice(i, i + 5);
-    if (tablePlayers.length === 5) {
-      tables.push({
-        id: `table-${i / 5}`,
-        number: i / 5 + 1,
-        players: tablePlayers,
-      });
-    }
+    tables.push({
+      id: `table-${i / 5}`,
+      number: i / 5 + 1,
+      players: tablePlayers,
+    });
   }
   console.log(tables);
   return tables;

@@ -56,7 +56,7 @@ export default function TablesScreen({ tables }: TablesScreenProps) {
               <div className="p-1">
                 {table.players.map((player, playerIndex) => {
                   const churchStyle = getChurchStyle(player.church);
-                  
+
                   return (
                     <motion.div
                       key={player.id}
@@ -81,6 +81,15 @@ export default function TablesScreen({ tables }: TablesScreenProps) {
                     </motion.div>
                   );
                 })}
+                {Array.from({ length: Math.max(0, 5 - table.players.length) }).map((_, i) => (
+                  <div
+                    key={`empty-${i}`}
+                    className="flex items-center px-1.5 py-1 rounded"
+                  >
+                    <span className="text-[10px] text-zinc-700 w-3">{table.players.length + i + 1}</span>
+                    <span className="text-xs text-zinc-700 italic ml-1.5">Empty</span>
+                  </div>
+                ))}
               </div>
             </motion.div>
           ))}

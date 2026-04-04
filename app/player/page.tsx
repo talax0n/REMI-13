@@ -305,7 +305,7 @@ function PlayerProfile({
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-[#0B0F1A]"
+      className="min-h-screen bg-[#0B0F1A] overflow-y-auto"
     >
       {/* Header */}
       <div className="sticky top-0 z-50 bg-[#0B0F1A]/90 backdrop-blur-sm border-b border-white/10">
@@ -327,7 +327,7 @@ function PlayerProfile({
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-lg mx-auto px-4 py-6 space-y-6 pb-24">
         {/* Player Header Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

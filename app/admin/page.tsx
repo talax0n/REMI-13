@@ -31,7 +31,6 @@ function buildTablesFromParticipants(parts: AdminParticipant[]): Table[] {
   });
   return Array.from(byTable.entries())
     .sort(([a], [b]) => a - b)
-    .filter(([, players]) => players.length === 5)
     .map(([num, players]) => ({
       id: `table-${num}`,
       number: num,
@@ -50,15 +49,20 @@ function buildTablesFromParticipants(parts: AdminParticipant[]): Table[] {
 
 // Generate initial admin participants from the data
 function generateInitialParticipants(): AdminParticipant[] {
-  return initialParticipants.map((p, index) => ({
-    id: `participant-${index}`,
-    name: p.name,
-    church: p.church,
-    score: Math.floor(Math.random() * 5000) + 5000,
-    matchesPlayed: Math.floor(Math.random() * 10),
-    status: p.active ? 'active' : 'eliminated',
-    tableNumber: p.active ? Math.floor(index / 5) + 1 : undefined,
-  }));
+  let activeIndex = 0;
+  return initialParticipants.map((p, index) => {
+    const tableNumber = p.active ? Math.floor(activeIndex / 5) + 1 : undefined;
+    if (p.active) activeIndex++;
+    return {
+      id: `participant-${index}`,
+      name: p.name,
+      church: p.church,
+      score: Math.floor(Math.random() * 5000) + 5000,
+      matchesPlayed: Math.floor(Math.random() * 10),
+      status: p.active ? 'active' : 'eliminated',
+      tableNumber,
+    };
+  });
 }
 
 // Extract unique churches
@@ -216,18 +220,24 @@ export default function AdminPage() {
   useEffect(() => {
     const sync = async () => {
       const tables = buildTablesFromParticipants(participants);
-      await Promise.all([
+      const fetches: Promise<unknown>[] = [
         fetch('/api/player', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ participants }),
         }).catch(console.error),
-        fetch('/api/tables', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(tables),
-        }).catch(console.error),
-      ]);
+      ];
+      // Only push tables when we have complete tables to show
+      if (tables.length > 0) {
+        fetches.push(
+          fetch('/api/tables', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(tables),
+          }).catch(console.error)
+        );
+      }
+      await Promise.all(fetches);
     };
     sync();
   }, [participants]);
