@@ -67,27 +67,27 @@ export default function PlayerQRCode({ isOpen, onClose }: PlayerQRCodeProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold flex items-center gap-2">
+      <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-sm w-[90vw] p-4 sm:p-6">
+        <DialogHeader className="space-y-2">
+          <DialogTitle className="text-lg sm:text-xl font-bold flex items-center gap-2">
             <QrCode className="w-5 h-5 text-emerald-400" />
             Player Score Portal
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* QR Code Display */}
-          <div className="bg-white rounded-2xl p-6 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-4 sm:p-6 flex items-center justify-center">
             {qrDataUrl ? (
               <motion.img
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 src={qrDataUrl}
                 alt="QR Code for Player Portal"
-                className="w-64 h-64"
+                className="w-48 h-48 sm:w-56 sm:h-56"
               />
             ) : (
-              <div className="w-64 h-64 bg-zinc-100 rounded-xl flex items-center justify-center">
+              <div className="w-48 h-48 sm:w-56 sm:h-56 bg-zinc-100 rounded-lg flex items-center justify-center">
                 <div className="w-8 h-8 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />
               </div>
             )}
@@ -104,15 +104,15 @@ export default function PlayerQRCode({ isOpen, onClose }: PlayerQRCodeProps) {
           </div>
 
           {/* URL Display */}
-          <div className="bg-zinc-800/50 rounded-lg p-3 flex items-center gap-2">
-            <code className="flex-1 text-sm text-zinc-400 truncate">
+          <div className="bg-zinc-800/50 rounded-lg p-2.5 sm:p-3 flex items-center gap-2">
+            <code className="flex-1 text-xs sm:text-sm text-zinc-400 truncate">
               {playerUrl}
             </code>
             <Button
               variant="ghost"
               size="sm"
               onClick={handleCopyLink}
-              className="text-zinc-400 hover:text-white"
+              className="text-zinc-400 hover:text-white h-8 w-8 p-0"
             >
               {copied ? (
                 <Check className="w-4 h-4 text-emerald-400" />
@@ -123,19 +123,19 @@ export default function PlayerQRCode({ isOpen, onClose }: PlayerQRCodeProps) {
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={handleDownload}
               disabled={!qrDataUrl}
-              className="flex-1 border-white/10 text-white hover:bg-white/10"
+              className="flex-1 border-white/10 text-white hover:bg-white/10 h-10 sm:h-11"
             >
               <Download className="w-4 h-4 mr-2" />
               Download
             </Button>
             <Button
               onClick={handleCopyLink}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-500"
+              className="flex-1 bg-emerald-600 hover:bg-emerald-500 h-10 sm:h-11"
             >
               <Share2 className="w-4 h-4 mr-2" />
               {copied ? 'Copied!' : 'Copy Link'}

@@ -305,7 +305,7 @@ function PlayerProfile({
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-[#0B0F1A] overflow-y-auto"
+      className="h-screen bg-[#0B0F1A] overflow-y-auto overflow-x-hidden"
     >
       {/* Header */}
       <div className="sticky top-0 z-50 bg-[#0B0F1A]/90 backdrop-blur-sm border-b border-white/10">
@@ -327,12 +327,12 @@ function PlayerProfile({
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-6 pb-24">
+      <div className="max-w-lg mx-auto px-4 py-4 space-y-4 pb-safe">
         {/* Player Header Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-800/50 to-zinc-900/50 border border-white/10 p-6"
+          className="relative overflow-hidden rounded-xl bg-gradient-to-br from-zinc-800/50 to-zinc-900/50 border border-white/10 p-4"
         >
           {/* Background decoration */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-yellow-500/10 to-transparent rounded-full blur-3xl" />
@@ -363,10 +363,10 @@ function PlayerProfile({
 
             {/* Total Score */}
             <div className="flex items-baseline gap-2">
-              <span className="text-5xl font-black text-white tracking-tight">
+              <span className="text-3xl sm:text-4xl font-black text-white tracking-tight">
                 {player.totalScore.toLocaleString()}
               </span>
-              <span className="text-zinc-500 text-sm">points</span>
+              <span className="text-zinc-500 text-sm">pts</span>
             </div>
           </div>
         </motion.div>
@@ -409,7 +409,7 @@ function PlayerProfile({
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.1 + index * 0.05 }}
                   className={`
-                    relative overflow-hidden rounded-xl border p-4 transition-all duration-200
+                    relative overflow-hidden rounded-lg border p-3 transition-all duration-200
                     ${isCompleted 
                       ? 'bg-zinc-800/30 border-emerald-500/20' 
                       : 'bg-zinc-900/30 border-white/5'
@@ -445,7 +445,7 @@ function PlayerProfile({
                     <div className="text-right">
                       {isCompleted ? (
                         <>
-                          <p className="text-2xl font-bold text-emerald-400">
+                          <p className="text-lg font-bold text-emerald-400">
                             +{phaseData.points.toLocaleString()}
                           </p>
                           <p className="text-xs text-zinc-500">
@@ -476,7 +476,7 @@ function PlayerProfile({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-zinc-900/30 border border-white/10 rounded-xl p-4"
+          className="bg-zinc-900/30 border border-white/10 rounded-lg p-4"
         >
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
