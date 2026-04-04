@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Filter, Users, ChevronUp, ChevronDown, Trash2, Edit2, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, Filter, Users, ChevronUp, ChevronDown, Trash2, Edit2, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -81,6 +81,8 @@ export default function ParticipantTable({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('score');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -145,6 +147,19 @@ export default function ParticipantTable({
 
     return result;
   }, [participants, searchQuery, churchFilter, statusFilter, sortField, sortDirection]);
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredParticipants.length / pageSize);
+  const paginatedParticipants = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    return filteredParticipants.slice(start, end);
+  }, [filteredParticipants, currentPage, pageSize]);
+
+  // Reset to first page when filters change
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [searchQuery, churchFilter, statusFilter, pageSize]);
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return null;
@@ -310,14 +325,14 @@ export default function ParticipantTable({
                       <TableCell><Skeleton className="h-8 w-20" /></TableCell>
                     </TableRow>
                   ))
-                ) : filteredParticipants.length === 0 ? (
+                ) : paginatedParticipants.length === 0 ? (
                   <TableRow className="border-white/5">
                     <TableCell colSpan={6} className="text-center py-8 text-zinc-500">
                       No participants found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredParticipants.map((participant) => {
+                  paginatedParticipants.map((participant) => {
                     const churchStyle = getChurchStyle(participant.church);
                     const isActive = participant.status === 'active';
                     return (
@@ -382,6 +397,94 @@ export default function ParticipantTable({
                 )}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/10">
+            {/* Page size selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-zinc-500">Show</span>
+              <Select value={pageSize.toString()} onValueChange={(v) => setPageSize(parseInt(v))}>
+                <SelectTrigger className="w-[80px] bg-zinc-800/50 border-white/10 text-white text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-800 border-white/10">
+                  {[10, 25, 50, 100].map((size) => (
+                    <SelectItem
+                      key={size}
+                      value={size.toString()}
+                      className="text-white hover:bg-zinc-700"
+                    >
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-zinc-500">entries</span>
+            </div>
+
+            {/* Page info */}
+            <div className="text-sm text-zinc-400">
+              Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredParticipants.length)} of {filteredParticipants.length} entries
+            </div>
+
+            {/* Page navigation */}
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="border-white/10 text-white hover:bg-white/10 disabled:opacity-50 h-8 w-8 p-0"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              
+              {/* Page numbers */}
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  // Show pages around current page
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`
+                        h-8 w-8 p-0 text-sm font-medium
+                        ${currentPage === pageNum 
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-0' 
+                          : 'border-white/10 text-white hover:bg-white/10'
+                        }
+                      `}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages || totalPages === 0}
+                className="border-white/10 text-white hover:bg-white/10 disabled:opacity-50 h-8 w-8 p-0"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

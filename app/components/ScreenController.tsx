@@ -1,55 +1,59 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Users, Maximize2, Minimize2 } from "lucide-react";
 import LeaderboardScreen from "./LeaderboardScreen";
 import TablesScreen from "./TablesScreen";
 import { ScreenType, Player, Table } from "./types";
-import { participants } from "./participants";
+import { PlayerScore } from "../player/types";
 
-// Generate players from ALL participant data (not just active ones)
-function generatePlayersFromParticipants(): Player[] {
-  return participants
-    .map((p, index) => {
-      // Generate realistic scores (deterministic based on index)
-      const baseScore = 10000 - index * 95;
-      const variance = (index * 37) % 300; // deterministic variance
-      return {
-        id: `player-${index}`,
-        name: p.name,
-        church: p.church,
-        score: baseScore + variance,
-        rank: index + 1,
-        status: (p.active ? "active" : "eliminated") as Player["status"],
-      };
-    })
-    .sort((a, b) => b.score - a.score)
-    .map((p, index) => ({ ...p, rank: index + 1 }));
+function convertToPlayers(scores: PlayerScore[]): Player[] {
+  return scores.map((p, index) => ({
+    id: p.id,
+    name: p.name,
+    church: p.church,
+    score: p.totalScore,
+    rank: index + 1,
+    status: p.status,
+  }));
 }
 
-// Generate tables from active players only, 5 per table
+// Fallback tables from player list when no admin shuffle has been pushed yet
 function generateTables(players: Player[]): Table[] {
   const active = players.filter((p) => p.status === "active");
   const tables: Table[] = [];
   for (let i = 0; i < active.length; i += 5) {
-    const tablePlayers = active.slice(i, i + 5);
     tables.push({
       id: `table-${i / 5}`,
       number: i / 5 + 1,
-      players: tablePlayers,
+      players: active.slice(i, i + 5),
     });
   }
-  console.log(tables);
   return tables;
 }
 
 export default function ScreenController() {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>("leaderboard");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [tables, setTables] = useState<Table[]>([]);
 
-  const players = useMemo(() => generatePlayersFromParticipants(), []);
-  const [tables, setTables] = useState<Table[]>(() => generateTables(players));
+  // Subscribe to live player scores (leaderboard)
+  useEffect(() => {
+    const es = new EventSource("/api/player/stream");
+    es.onmessage = (e) => {
+      try {
+        const data: PlayerScore[] = JSON.parse(e.data);
+        if (Array.isArray(data) && data.length > 0) {
+          setPlayers(convertToPlayers(data));
+        }
+      } catch {
+        // ignore malformed events
+      }
+    };
+    return () => es.close();
+  }, []);
 
   // Subscribe to real-time table updates via SSE
   useEffect(() => {
@@ -66,6 +70,9 @@ export default function ScreenController() {
     };
     return () => es.close();
   }, []);
+
+  // Fall back to player-derived tables until admin pushes a shuffle
+  const displayTables = tables.length > 0 ? tables : generateTables(players);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -168,7 +175,7 @@ export default function ScreenController() {
               transition={{ duration: 0.2 }}
               className="h-full"
             >
-              <TablesScreen tables={tables} />
+              <TablesScreen tables={displayTables} />
             </motion.div>
           )}
         </AnimatePresence>

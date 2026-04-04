@@ -144,7 +144,7 @@ export default function AdminPage() {
     let tableGroups: EngineParticipant[][];
 
     try {
-      tableGroups = engineGenerateTables(engineParticipants, { fallbackRelaxRepeat: true });
+      tableGroups = engineGenerateTables(engineParticipants).tables;
       // Record new opponents so future rounds respect prior matchups
       updateOpponents(tableGroups);
     } catch {
@@ -204,17 +204,35 @@ export default function AdminPage() {
 
   // Save scores from table scoring
   const handleSaveScores = useCallback(async (updates: { id: string; score: number }[]) => {
+    const phaseUpdates = updates.map((u) => {
+      const participant = participants.find((p) => p.id === u.id);
+      return {
+        id: u.id,
+        phase: tournamentState.phase,
+        points: u.score,
+        tableNumber: participant?.tableNumber,
+      };
+    });
+
+    // 1. Record per-phase history first so the player detail view is consistent
+    //    before the leaderboard totalScore propagates via the useEffect sync.
+    await fetch('/api/player', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phaseUpdates }),
+    }).catch(console.error);
+
+    // 2. Update cumulative scores in admin state.
+    //    The useEffect will pick this up and push ap.score → totalScore via
+    //    syncFromAdminParticipants, updating the leaderboard in real-time.
     setParticipants((prev) =>
       prev.map((p) => {
         const update = updates.find((u) => u.id === p.id);
-        if (update) {
-          return { ...p, score: p.score + update.score };
-        }
-        return p;
+        return update ? { ...p, score: p.score + update.score } : p;
       })
     );
     updateTournamentStats();
-  }, [updateTournamentStats]);
+  }, [participants, tournamentState.phase, updateTournamentStats]);
 
   // Sync participants to player store and push tables to display whenever participants change
   useEffect(() => {

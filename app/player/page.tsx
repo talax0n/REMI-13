@@ -36,16 +36,6 @@ function getRankIcon(rank: number) {
   return <span className="text-zinc-500 font-bold">#{rank}</span>;
 }
 
-// Sample participant names for search (would come from API in production)
-const SAMPLE_PARTICIPANTS = [
-  'Waris K', 'Taruli S', 'Tommy E N', 'Ode R', 'Yeldy T',
-  'Alfrits M', 'Robby Rengkung', 'Yohanes T', 'Roy M', 'Jannes',
-  'Ropen Silitonga', 'Robert Aruan', 'Jimmy Yoo', 'Ronald Pieter',
-  'P.Hehanusa', 'Berlin H', 'Andre Siahaya', 'Ventje DK', 'Benny Palit',
-  'FOL', 'Ade Persulessy', 'Roger P', 'Florus N', 'Wemrom',
-  'Waediono sir', 'Silas Teri', 'Nus R', 'Theo W Manari',
-  'Ferry Ginting', 'Kladius Telussa', 'Kris Sanjaya', 'Jemmi Wuri'
-].sort();
 
 // Login Form Component
 function LoginForm({ 
@@ -137,9 +127,9 @@ function LoginForm({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="min-h-screen bg-[#0B0F1A] p-4 flex items-center justify-center"
+      className="min-h-screen bg-[#0B0F1A] p-4 flex items-start justify-center overflow-y-auto pt-8 pb-32"
     >
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md relative">
         {/* Header */}
         <div className="text-center mb-8">
           <motion.div
@@ -603,31 +593,57 @@ export default function PlayerPage() {
   const [view, setView] = useState<PlayerView>('login');
   const [player, setPlayer] = useState<PlayerScore | null>(null);
   const [loading, setLoading] = useState(false);
+  const [allPlayers, setAllPlayers] = useState<PlayerScore[]>([]);
 
-  // Get unique churches from participants data
-  const churches = [
-    'DS', 'Agape', 'Trinitas', 'MK', 'Horeb', 'MI', 'BK', 'Cipeucang', 
-    'DK', 'Jatipon', 'Hosiana', 'Galilea', 'GMIM', 'Pelita', 'Paulus', 'Retas Karunia'
-  ].sort();
+  // Subscribe to the same live stream the leaderboard uses.
+  // - Populates the name/church search from real player data.
+  // - Keeps the profile view in sync when admin records scores.
+  useEffect(() => {
+    const es = new EventSource('/api/player/stream');
+    es.onmessage = (e) => {
+      try {
+        const data: PlayerScore[] = JSON.parse(e.data);
+        if (!Array.isArray(data)) return;
+        setAllPlayers(data);
+        // Update the displayed profile with fresh score + live rank
+        setPlayer((prev) => {
+          if (!prev) return prev;
+          const idx = data.findIndex((p) => p.id === prev.id);
+          if (idx === -1) return prev;
+          return { ...data[idx], rank: idx + 1 };
+        });
+      } catch {
+        // ignore malformed events
+      }
+    };
+    return () => es.close();
+  }, []);
+
+  // Derived from live stream — same source as the leaderboard
+  const availableParticipants = allPlayers.map((p) => p.name).sort();
+  const churches = Array.from(new Set(allPlayers.map((p) => p.church))).sort();
 
   const handleLogin = useCallback(async (data: LoginFormData) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/player?name=${encodeURIComponent(data.name)}&church=${encodeURIComponent(data.church)}`);
-      
+      const response = await fetch(
+        `/api/player?name=${encodeURIComponent(data.name)}&church=${encodeURIComponent(data.church)}`
+      );
       if (response.ok) {
-        const playerData = await response.json();
-        setPlayer(playerData);
+        const playerData: PlayerScore = await response.json();
+        // Derive rank from the live sorted list so it's consistent with the leaderboard
+        const idx = allPlayers.findIndex((p) => p.id === playerData.id);
+        setPlayer({ ...playerData, rank: idx >= 0 ? idx + 1 : playerData.rank });
         setView('profile');
       } else {
         setView('not-found');
       }
-    } catch (error) {
+    } catch {
       setView('not-found');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [allPlayers]);
 
   const handleBack = useCallback(() => {
     setView('login');
@@ -637,19 +653,19 @@ export default function PlayerPage() {
   return (
     <AnimatePresence mode="wait">
       {view === 'login' && (
-        <LoginForm 
+        <LoginForm
           key="login"
-          onSubmit={handleLogin} 
-          loading={loading} 
+          onSubmit={handleLogin}
+          loading={loading}
           churches={churches}
-          availableParticipants={SAMPLE_PARTICIPANTS}
+          availableParticipants={availableParticipants}
         />
       )}
-      
+
       {view === 'not-found' && (
         <NotFoundView key="not-found" onBack={handleBack} />
       )}
-      
+
       {view === 'profile' && player && (
         <PlayerProfile key="profile" player={player} onBack={handleBack} />
       )}
