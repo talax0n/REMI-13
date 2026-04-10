@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Trophy, 
   Search, 
   AlertCircle, 
   ChevronRight, 
@@ -136,9 +135,9 @@ function LoginForm({
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="w-20 h-20 rounded-2xl bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center mx-auto mb-4 shadow-2xl shadow-yellow-500/20"
+            className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4"
           >
-            <Trophy className="w-10 h-10 text-yellow-950" />
+            <img src="/LOGO.png" alt="Remi 13 Logo" className="w-20 h-20 rounded-2xl object-contain" />
           </motion.div>
           <h1 className="text-3xl font-bold text-white mb-2">Remi 13</h1>
           <p className="text-zinc-400">Check your tournament scores</p>

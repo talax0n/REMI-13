@@ -12,7 +12,8 @@ import TableScoring from './components/TableScoring';
 import PlayerQRCode from './components/PlayerQRCode';
 import { Button } from '@/components/ui/button';
 import { AdminParticipant, TournamentState } from './types';
-import { QrCode, RotateCcw, SkipBack, Trash2, AlertTriangle } from 'lucide-react';
+import { QrCode, RotateCcw, SkipBack, Trash2, AlertTriangle, LogOut } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -77,6 +78,7 @@ export default function AdminPage() {
   const [showPhaseBackWarning, setShowPhaseBackWarning] = useState(false);
   const [showResetAllScoresWarning, setShowResetAllScoresWarning] = useState(false);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
   const [phaseScores, setPhaseScores] = useState<Record<string, Record<number, number>>>({});
   // Tracks whether the initial DB load has been applied.
   // The sync useEffect must not fire for that first setParticipants call —
@@ -345,6 +347,11 @@ export default function AdminPage() {
     setShowResetAllScoresWarning(false);
   }, [updateTournamentStats]);
 
+  const handleLogout = useCallback(async () => {
+    await fetch('/api/admin/auth', { method: 'DELETE' });
+    router.replace('/admin/login');
+  }, [router]);
+
   const handleResetDatabase = useCallback(async () => {
     const response = await fetch('/api/admin', {
       method: 'POST',
@@ -493,9 +500,7 @@ export default function AdminPage() {
               animate={{ opacity: 1, x: 0 }}
               className="flex items-center gap-3"
             >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-500 to-yellow-600 flex items-center justify-center">
-                <span className="text-xl font-bold text-yellow-950">R</span>
-              </div>
+              <img src="/LOGO.png" alt="Remi 13 Logo" className="w-10 h-10 rounded-xl object-contain" />
               <div>
                 <h1 className="text-xl font-bold text-white">Remi 13 Admin</h1>
                 <p className="text-sm text-zinc-500">Tournament Control Panel</p>
@@ -507,6 +512,15 @@ export default function AdminPage() {
               animate={{ opacity: 1, x: 0 }}
               className="flex items-center gap-4"
             >
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="border-white/10 text-zinc-400 hover:bg-white/5 hover:text-white"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

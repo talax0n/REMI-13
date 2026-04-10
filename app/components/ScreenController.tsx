@@ -141,9 +141,7 @@ export default function ScreenController() {
       <nav className="h-16 flex items-center justify-between px-6 border-b border-white/5 bg-[#0a0a0b]">
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-500 to-yellow-600 flex items-center justify-center">
-            <Trophy className="w-4 h-4 text-yellow-950" />
-          </div>
+          <img src="/LOGO.png" alt="Remi 13 Logo" className="w-8 h-8 rounded-lg object-contain" />
           <span
             className="text-lg font-bold text-white"
             style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
