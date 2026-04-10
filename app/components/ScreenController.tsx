@@ -207,7 +207,7 @@ export default function ScreenController() {
               transition={{ duration: 0.2 }}
               className="h-full"
             >
-              <LeaderboardScreen players={players} />
+              <LeaderboardScreen players={players} currentPhase={currentPhase} />
             </motion.div>
           )}
           {currentScreen === "tables" && (

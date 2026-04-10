@@ -177,8 +177,8 @@ export default function AdminPage() {
 
       const updated = participants.map((p) => {
         const tableNum = tableNumberMap.get(p.id);
-        if (tableNum) return { ...p, tableNumber: tableNum };
-        if (p.status === 'active') return { ...p, status: 'eliminated' as const, tableNumber: undefined };
+        if (tableNum) return { ...p, tableNumber: tableNum, eliminatedAtPhase: undefined };
+        if (p.status === 'active') return { ...p, status: 'eliminated' as const, tableNumber: undefined, eliminatedAtPhase: 5 };
         return p;
       });
 
@@ -238,7 +238,7 @@ export default function AdminPage() {
           };
         }
         // Not in top 20 → eliminated
-        return { ...p, status: 'eliminated' as const, tableNumber: undefined };
+        return { ...p, status: 'eliminated' as const, tableNumber: undefined, eliminatedAtPhase: 4 };
       });
 
       setParticipants(updated);
@@ -317,10 +317,12 @@ export default function AdminPage() {
   // Go back to previous phase
   const handlePhaseBack = useCallback(() => {
     setTournamentState((prev) => {
+      const newPhase = Math.max(1, prev.phase - 1);
       const next = {
         ...prev,
-        phase: Math.max(1, prev.phase - 1),
+        phase: newPhase,
         status: 'waiting' as TournamentState['status'],
+        isFinalPhase: false,
       };
       fetch('/api/admin', {
         method: 'POST',
@@ -329,8 +331,19 @@ export default function AdminPage() {
       }).catch(console.error);
       return next;
     });
+    // Restore players that were eliminated at or after the phase we're going back to
+    setParticipants((prev) => {
+      const newPhase = Math.max(1, tournamentState.phase - 1);
+      return prev.map((p) => {
+        if (p.status === 'eliminated' && (p.eliminatedAtPhase ?? 0) >= newPhase) {
+          const { eliminatedAtPhase: _, ...rest } = p;
+          return { ...rest, status: 'active' as const, tableNumber: undefined };
+        }
+        return p;
+      });
+    });
     setShowPhaseBackWarning(false);
-  }, []);
+  }, [tournamentState.phase]);
 
   // Reset all scores (set all participant scores to 0)
   const handleResetAllScores = useCallback(async () => {

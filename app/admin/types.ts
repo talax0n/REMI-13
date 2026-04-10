@@ -7,6 +7,7 @@ export interface AdminParticipant {
   tableNumber?: number;
   opponents?: string[];
   status: 'active' | 'eliminated' | 'winner';
+  eliminatedAtPhase?: number;
 }
 
 export interface TournamentState {

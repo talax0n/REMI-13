@@ -31,9 +31,7 @@ export async function getPlayerScores(): Promise<PlayerScore[]> {
 }
 
 export async function getLeaderboard(): Promise<PlayerScore[]> {
-  const rows = await query<PlayerRow>(
-    "SELECT * FROM players WHERE status != 'eliminated' ORDER BY total_score DESC"
-  );
+  const rows = await query<PlayerRow>('SELECT * FROM players ORDER BY total_score DESC');
   return rows.map(rowToPlayerScore);
 }
 
