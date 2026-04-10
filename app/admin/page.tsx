@@ -24,7 +24,6 @@ import { Table, Player } from '../components/types';
 import {
   generateTables as engineGenerateTables,
   updateOpponents,
-  generateTablesCompat,
   generateFinalTables,
   Participant as EngineParticipant,
 } from '@/lib/shuffle-engine';
@@ -78,6 +77,7 @@ export default function AdminPage() {
   const [showPhaseBackWarning, setShowPhaseBackWarning] = useState(false);
   const [showResetAllScoresWarning, setShowResetAllScoresWarning] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [phaseScores, setPhaseScores] = useState<Record<string, Record<number, number>>>({});
   // Tracks whether the initial DB load has been applied.
   // The sync useEffect must not fire for that first setParticipants call —
   // the DB already has correct state; syncing would unnecessarily overwrite tables.
@@ -146,20 +146,19 @@ export default function AdminPage() {
   const handleShuffle = useCallback(async () => {
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    // Check if this is the final phase (phase 6)
-    if (tournamentState.phase === 6) {
-      // Get top 10 players by score
-      const topTen = [...participants]
+    // Phase 5 → Final (top 10, snake draft into 2 tables)
+    if (tournamentState.phase === 5) {
+      const sorted = [...participants]
         .filter((p) => p.status === 'active')
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 10);
+        .sort((a, b) => b.score - a.score);
+
+      const topTen = sorted.slice(0, 10);
 
       if (topTen.length < 10) {
-        toast.error('Need at least 10 active players for final phase');
+        toast.error('Butuh minimal 10 pemain aktif untuk babak final');
         return;
       }
 
-      // Convert to engine format
       const engineParticipants: EngineParticipant[] = topTen.map((p) => ({
         id: p.id,
         name: p.name,
@@ -168,44 +167,93 @@ export default function AdminPage() {
         opponents: new Set(p.opponents ?? []),
       }));
 
-      // Generate final tables using snake draft
       const { tableA, tableB } = generateFinalTables(engineParticipants);
 
-      // Build lookup maps
       const tableNumberMap = new Map<string, number>();
-      tableA.forEach((p) => tableNumberMap.set(p.id, 1)); // Table A = table 1
-      tableB.forEach((p) => tableNumberMap.set(p.id, 2)); // Table B = table 2
+      tableA.forEach((p) => tableNumberMap.set(p.id, 1));
+      tableB.forEach((p) => tableNumberMap.set(p.id, 2));
 
-      // Update participants
       const updated = participants.map((p) => {
         const tableNum = tableNumberMap.get(p.id);
-        if (tableNum) {
-          return { ...p, tableNumber: tableNum };
-        }
-        // Eliminate players not in top 10
-        if (p.status === 'active') {
-          return { ...p, status: 'eliminated' as const };
-        }
+        if (tableNum) return { ...p, tableNumber: tableNum };
+        if (p.status === 'active') return { ...p, status: 'eliminated' as const, tableNumber: undefined };
         return p;
       });
 
       setParticipants(updated);
-      setTournamentState((prev) => ({ 
-        ...prev, 
+      setTournamentState((prev) => ({
+        ...prev,
         isFinalPhase: true,
         totalTables: 2,
         finalTableA: [1, 3, 5, 7, 9],
         finalTableB: [2, 4, 6, 8, 10],
       }));
-      
-      toast.success('Final phase tables created! Top 10 players assigned.');
       return;
     }
 
-    const activeParticipants = participants.filter((p) => p.status === 'active');
+    // Phase 4 → Semifinal (top 20, 4 tables)
+    if (tournamentState.phase === 4) {
+      const sorted = [...participants]
+        .filter((p) => p.status === 'active')
+        .sort((a, b) => b.score - a.score);
 
-    // Convert to engine format, carrying over opponent history
-    const engineParticipants: EngineParticipant[] = activeParticipants.map((p) => ({
+      const topTwenty = sorted.slice(0, 20);
+
+      if (topTwenty.length < 5) {
+        toast.error('Tidak cukup pemain aktif untuk babak semifinal');
+        return;
+      }
+
+      const engineParticipants: EngineParticipant[] = topTwenty.map((p) => ({
+        id: p.id,
+        name: p.name,
+        church: p.church,
+        score: p.score,
+        opponents: new Set(p.opponents ?? []),
+      }));
+
+      const shuffleResult = engineGenerateTables(engineParticipants);
+      const tableGroups = shuffleResult.tables;
+      updateOpponents(tableGroups);
+
+      const tableNumberMap = new Map<string, number>();
+      const opponentsMap = new Map<string, string[]>();
+      tableGroups.forEach((group, i) => {
+        group.forEach((p) => {
+          tableNumberMap.set(p.id, i + 1);
+          opponentsMap.set(p.id, Array.from(p.opponents));
+        });
+      });
+
+      const updated = participants.map((p) => {
+        if (p.status !== 'active') return p;
+        const tableNum = tableNumberMap.get(p.id);
+        if (tableNum !== undefined) {
+          return {
+            ...p,
+            tableNumber: tableNum,
+            opponents: opponentsMap.get(p.id) ?? p.opponents,
+          };
+        }
+        // Not in top 20 → eliminated
+        return { ...p, status: 'eliminated' as const, tableNumber: undefined };
+      });
+
+      setParticipants(updated);
+      return;
+    }
+
+    // Phases 1–3 → regular reshuffle
+    // Only assign complete tables of 5; lowest-scoring remainder sit out this phase
+    const allActive = participants
+      .filter((p) => p.status === 'active')
+      .sort((a, b) => b.score - a.score);
+
+    const tableCount = Math.floor(allActive.length / 5);
+    const assignable = allActive.slice(0, tableCount * 5);
+    const sittingOut = new Set(allActive.slice(tableCount * 5).map((p) => p.id));
+
+    const engineParticipants: EngineParticipant[] = assignable.map((p) => ({
       id: p.id,
       name: p.name,
       church: p.church,
@@ -218,16 +266,13 @@ export default function AdminPage() {
     try {
       const shuffleResult = engineGenerateTables(engineParticipants);
       tableGroups = shuffleResult.tables;
-      // Record new opponents so future rounds respect prior matchups
       updateOpponents(tableGroups);
     } catch {
-      // Fallback: plain random shuffle (e.g. count not divisible by 5)
       const pool = [...engineParticipants].sort(() => Math.random() - 0.5);
       tableGroups = [];
       for (let i = 0; i < pool.length; i += 5) tableGroups.push(pool.slice(i, i + 5));
     }
 
-    // Build lookup maps from the engine results
     const tableNumberMap = new Map<string, number>();
     const opponentsMap = new Map<string, string[]>();
     tableGroups.forEach((group, i) => {
@@ -239,6 +284,7 @@ export default function AdminPage() {
 
     const updated = participants.map((p) => {
       if (p.status !== 'active') return p;
+      if (sittingOut.has(p.id)) return { ...p, tableNumber: undefined };
       return {
         ...p,
         tableNumber: tableNumberMap.get(p.id) ?? p.tableNumber,
@@ -247,8 +293,7 @@ export default function AdminPage() {
     });
 
     setParticipants(updated);
-    // The useEffect will push updated tables to the display
-  }, [participants]);
+  }, [participants, tournamentState.phase]);
 
   // Complete phase and advance
   const handlePhaseComplete = useCallback(() => {
@@ -300,6 +345,33 @@ export default function AdminPage() {
     setShowResetAllScoresWarning(false);
   }, [updateTournamentStats]);
 
+  const handleResetDatabase = useCallback(async () => {
+    const response = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'resetDatabase' }),
+    });
+
+    if (!response.ok) {
+      toast.error('Failed to reset database');
+      return;
+    }
+
+    const data = await response.json();
+    setParticipants(data.participants);
+    setTournamentState(data.tournamentState);
+    setPhaseScores({});
+    setShowResetWarning(false);
+
+    await fetch('/api/tables', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([]),
+    }).catch(console.error);
+
+    toast.success('Database reset with latest participant seed');
+  }, []);
+
   // Delete participant
   const handleDeleteParticipant = useCallback(async (id: string) => {
     setParticipants((prev) => prev.filter((p) => p.id !== id));
@@ -316,16 +388,10 @@ export default function AdminPage() {
     updateTournamentStats();
   }, [updateTournamentStats]);
 
-  // Track previous phase scores to calculate differences when updating
-  const [phaseScores, setPhaseScores] = useState<Record<string, Record<number, number>>>({});
-
   // Save scores from table scoring with phase tracking
   const handleSaveScores = useCallback(async (updates: { id: string; score: number; phase: number }[]) => {
     const phaseUpdates = updates.map((u) => {
       const participant = participants.find((p) => p.id === u.id);
-      // Calculate the actual change: new score - previous score for this phase
-      const previousScore = phaseScores[u.id]?.[u.phase] ?? 0;
-      const scoreChange = u.score - previousScore;
       
       return {
         id: u.id,
@@ -441,6 +507,15 @@ export default function AdminPage() {
               animate={{ opacity: 1, x: 0 }}
               className="flex items-center gap-4"
             >
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowResetWarning(true)}
+                className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Reset DB
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -582,6 +657,39 @@ export default function AdminPage() {
             >
               <SkipBack className="w-4 h-4 mr-2" />
               Go Back
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showResetWarning} onOpenChange={setShowResetWarning}>
+        <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <AlertTriangle className="w-6 h-6 text-amber-500" />
+              Reset Database Data?
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400 pt-2">
+              This will replace all current participant records in the database with the latest seeded list,
+              reset all scores and match history, clear table assignments, and return the tournament to phase 1.
+              <br /><br />
+              <span className="text-amber-400 font-bold">This action cannot be undone.</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowResetWarning(false)}
+              className="flex-1 border-white/10 text-white hover:bg-white/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleResetDatabase}
+              className="flex-1 bg-amber-600 hover:bg-amber-500 text-white"
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Reset Database
             </Button>
           </div>
         </DialogContent>

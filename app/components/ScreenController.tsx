@@ -7,6 +7,7 @@ import LeaderboardScreen from "./LeaderboardScreen";
 import TablesScreen from "./TablesScreen";
 import { ScreenType, Player, Table } from "./types";
 import { PlayerScore } from "../player/types";
+import { participants } from "./participants";
 
 function convertToPlayers(scores: PlayerScore[]): Player[] {
   return scores.map((p, index) => ({
@@ -16,21 +17,40 @@ function convertToPlayers(scores: PlayerScore[]): Player[] {
     score: p.totalScore,
     rank: index + 1,
     status: p.status,
+    currentTable: p.currentTable,
   }));
 }
 
-// Fallback tables from player list when no admin shuffle has been pushed yet
-function generateTables(players: Player[]): Table[] {
-  const active = players.filter((p) => p.status === "active");
-  const tables: Table[] = [];
-  for (let i = 0; i < active.length; i += 5) {
-    tables.push({
-      id: `table-${i / 5}`,
-      number: i / 5 + 1,
-      players: active.slice(i, i + 5),
-    });
+// Phase 1 fallback: build tables directly from static participants.ts data,
+// merging live scores by name lookup.
+function buildPhase1Tables(players: Player[]): Table[] {
+  const scoreByName = new Map<string, number>();
+  for (const p of players) {
+    scoreByName.set(p.name.toUpperCase(), p.score);
   }
-  return tables;
+
+  const tableMap = new Map<number, Player[]>();
+  participants
+    .filter((p) => p.active)
+    .forEach((p, index) => {
+      const tableNum = p.tableNumber ?? 1;
+      if (!tableMap.has(tableNum)) tableMap.set(tableNum, []);
+      tableMap.get(tableNum)!.push({
+        id: `p1-${index}`,
+        name: p.name,
+        church: p.church,
+        score: scoreByName.get(p.name.toUpperCase()) ?? 0,
+        rank: 0,
+      });
+    });
+
+  return Array.from(tableMap.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([num, tablePlayers]) => ({
+      id: `table-p1-${num}`,
+      number: num,
+      players: tablePlayers,
+    }));
 }
 
 export default function ScreenController() {
@@ -38,6 +58,26 @@ export default function ScreenController() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [players, setPlayers] = useState<Player[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
+  const [currentPhase, setCurrentPhase] = useState(1);
+
+  // Fetch current tournament phase on mount, then poll every 5s
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchPhase() {
+      try {
+        const res = await fetch("/api/admin");
+        const data = await res.json();
+        if (!cancelled && data.tournamentState?.phase) {
+          setCurrentPhase(data.tournamentState.phase);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    fetchPhase();
+    const interval = setInterval(fetchPhase, 5000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
 
   // Subscribe to live player scores (leaderboard)
   useEffect(() => {
@@ -71,8 +111,14 @@ export default function ScreenController() {
     return () => es.close();
   }, []);
 
-  // Fall back to player-derived tables until admin pushes a shuffle
-  const displayTables = tables.length > 0 ? tables : generateTables(players);
+  // Phase 1: ALWAYS use static participants.ts formation
+  // Phases 2+: use admin-pushed shuffled tables from SSE
+  const displayTables =
+    currentPhase === 1
+      ? buildPhase1Tables(players)
+      : tables.length > 0
+        ? tables
+        : buildPhase1Tables(players);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {

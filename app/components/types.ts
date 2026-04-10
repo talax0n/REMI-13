@@ -6,6 +6,7 @@ export interface Player {
   rank: number;
   previousRank?: number;
   status?: 'active' | 'eliminated' | 'winner';
+  currentTable?: number;
 }
 
 export interface Table {

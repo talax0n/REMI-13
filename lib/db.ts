@@ -59,7 +59,7 @@ async function runMigration(): Promise<void> {
       );
 
       INSERT INTO tournament_state (id, phase, status, max_phases)
-      VALUES (1, 1, 'waiting', 5)
+      VALUES (1, 1, 'completed', 6)
       ON CONFLICT (id) DO NOTHING;
     `);
   } finally {

@@ -33,12 +33,12 @@ export default function ShuffleControl({ state, onShuffle, onPhaseComplete }: Sh
   const handleShuffleClick = () => {
     if (!canShuffle) {
       if (state.phase >= state.maxPhases) {
-        toast.error('Tournament completed', {
-          description: 'All phases have been completed.',
+        toast.error('Turnamen selesai', {
+          description: 'Semua fase telah selesai.',
         });
       } else if (state.totalParticipants < 5) {
-        toast.error('Not enough participants', {
-          description: 'Need at least 5 participants to generate tables.',
+        toast.error('Peserta tidak cukup', {
+          description: 'Butuh minimal 5 peserta untuk generate meja.',
         });
       }
       return;
@@ -54,15 +54,19 @@ export default function ShuffleControl({ state, onShuffle, onPhaseComplete }: Sh
     
     try {
       await onShuffle();
-      toast.success('Tables generated successfully', {
+      const label =
+        state.phase === 4 ? 'Semifinal (Top 20)' :
+        state.phase === 5 ? 'Final (Top 10)' :
+        `Fase ${state.phase + 1}`;
+      toast.success('Meja berhasil dibuat', {
         id: 'shuffle',
-        description: `Phase ${state.phase + 1} tables have been created.`,
+        description: `Meja untuk ${label} sudah siap.`,
       });
       onPhaseComplete();
     } catch (error) {
-      toast.error('Failed to generate tables', {
+      toast.error('Gagal membuat meja', {
         id: 'shuffle',
-        description: 'Please try again.',
+        description: 'Silakan coba lagi.',
       });
     } finally {
       setIsShuffling(false);
@@ -154,16 +158,25 @@ export default function ShuffleControl({ state, onShuffle, onPhaseComplete }: Sh
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-yellow-500" />
-              Confirm Table Generation
+              Konfirmasi Generate Meja
             </DialogTitle>
             <DialogDescription className="text-zinc-400">
-              This action will generate tables for Phase {state.phase + 1}. Current table assignments will be overwritten.
+              {state.phase === 4
+                ? 'Akan memilih 20 pemain teratas untuk Semifinal (Fase 5).'
+                : state.phase === 5
+                ? 'Akan memilih 10 pemain teratas untuk Final (Fase 6).'
+                : `Akan men-shuffle meja untuk Fase ${state.phase + 1}.`}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 my-4">
             <p className="text-sm text-yellow-400">
-              <strong>Warning:</strong> This action cannot be undone. All current table assignments will be replaced with new randomized tables.
+              <strong>Peringatan:</strong>{' '}
+              {state.phase === 4
+                ? 'Pemain di luar Top 20 akan dieliminasi.'
+                : state.phase === 5
+                ? 'Pemain di luar Top 10 akan dieliminasi.'
+                : 'Semua penugasan meja saat ini akan diganti.'}
             </p>
           </div>
 

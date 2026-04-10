@@ -2,6 +2,7 @@ import {
   getPlayerScores,
   getPlayerByNameAndChurch,
   syncFromAdminParticipants,
+  resetAllPlayerScores,
   updatePlayerPhaseScore,
 } from '@/lib/player-store';
 
@@ -40,6 +41,11 @@ export async function POST(request: Request) {
       )
     );
     return Response.json({ ok: true, count: updates.length });
+  }
+
+  if (body.resetScores) {
+    await resetAllPlayerScores();
+    return Response.json({ ok: true });
   }
 
   return Response.json({ error: 'Invalid request' }, { status: 400 });

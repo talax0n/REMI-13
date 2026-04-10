@@ -12,11 +12,12 @@ interface PhaseStatusProps {
 }
 
 const phaseLabels: Record<number, string> = {
-  1: 'Round of 16',
-  2: 'Quarter Finals',
-  3: 'Semi Finals',
-  4: 'Finals',
-  5: 'Championship',
+  1: 'Fase Reguler 1',
+  2: 'Fase Reguler 2',
+  3: 'Fase Reguler 3',
+  4: 'Fase Reguler 4',
+  5: 'Semifinal (Top 20)',
+  6: 'Final (Top 10)',
 };
 
 const statusConfig = {

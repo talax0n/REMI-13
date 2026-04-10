@@ -68,6 +68,32 @@ export async function updatePlayerPhaseScore(
   );
 }
 
+export async function resetAllPlayerScores(): Promise<void> {
+  await query(
+    `UPDATE players
+     SET total_score = 0,
+         matches_played = 0,
+         scores = '{}'::jsonb,
+         updated_at = NOW()`
+  );
+}
+
+export async function replaceAllAdminParticipants(
+  adminParticipants: Array<{
+    id: string;
+    name: string;
+    church: string;
+    score: number;
+    status: string;
+    tableNumber?: number;
+    opponents?: string[];
+    matchesPlayed?: number;
+  }>
+): Promise<void> {
+  await query('DELETE FROM players');
+  await syncFromAdminParticipants(adminParticipants);
+}
+
 export async function syncFromAdminParticipants(
   adminParticipants: Array<{
     id: string;
