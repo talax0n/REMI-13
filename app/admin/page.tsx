@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 import ShuffleControl from './components/ShuffleControl';
 import ParticipantForm from './components/ParticipantForm';
 import BulkImportUploader from './components/BulkImportUploader';
@@ -25,6 +25,7 @@ import {
   generateTables as engineGenerateTables,
   updateOpponents,
   generateTablesCompat,
+  generateFinalTables,
   Participant as EngineParticipant,
 } from '@/lib/shuffle-engine';
 
@@ -68,7 +69,8 @@ export default function AdminPage() {
     status: 'waiting',
     totalParticipants: 0,
     totalTables: 0,
-    maxPhases: 5,
+    maxPhases: 6,
+    isFinalPhase: false,
   });
   const [activeTab, setActiveTab] = useState<TabType>('participants');
   const [showQRCode, setShowQRCode] = useState(false);
@@ -143,6 +145,62 @@ export default function AdminPage() {
   // Shuffle tables
   const handleShuffle = useCallback(async () => {
     await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    // Check if this is the final phase (phase 6)
+    if (tournamentState.phase === 6) {
+      // Get top 10 players by score
+      const topTen = [...participants]
+        .filter((p) => p.status === 'active')
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 10);
+
+      if (topTen.length < 10) {
+        toast.error('Need at least 10 active players for final phase');
+        return;
+      }
+
+      // Convert to engine format
+      const engineParticipants: EngineParticipant[] = topTen.map((p) => ({
+        id: p.id,
+        name: p.name,
+        church: p.church,
+        score: p.score,
+        opponents: new Set(p.opponents ?? []),
+      }));
+
+      // Generate final tables using snake draft
+      const { tableA, tableB } = generateFinalTables(engineParticipants);
+
+      // Build lookup maps
+      const tableNumberMap = new Map<string, number>();
+      tableA.forEach((p) => tableNumberMap.set(p.id, 1)); // Table A = table 1
+      tableB.forEach((p) => tableNumberMap.set(p.id, 2)); // Table B = table 2
+
+      // Update participants
+      const updated = participants.map((p) => {
+        const tableNum = tableNumberMap.get(p.id);
+        if (tableNum) {
+          return { ...p, tableNumber: tableNum };
+        }
+        // Eliminate players not in top 10
+        if (p.status === 'active') {
+          return { ...p, status: 'eliminated' as const };
+        }
+        return p;
+      });
+
+      setParticipants(updated);
+      setTournamentState((prev) => ({ 
+        ...prev, 
+        isFinalPhase: true,
+        totalTables: 2,
+        finalTableA: [1, 3, 5, 7, 9],
+        finalTableB: [2, 4, 6, 8, 10],
+      }));
+      
+      toast.success('Final phase tables created! Top 10 players assigned.');
+      return;
+    }
 
     const activeParticipants = participants.filter((p) => p.status === 'active');
 

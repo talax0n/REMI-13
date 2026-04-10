@@ -470,6 +470,31 @@ export function updateOpponents(tables: Participant[][]): void {
 }
 
 /**
+ * Generate final phase tables (Phase 6) for top 10 players.
+ * Uses snake draft order:
+ * - Table A: Odd ranks (1, 3, 5, 7, 9)
+ * - Table B: Even ranks (2, 4, 6, 8, 10)
+ */
+export function generateFinalTables(
+  topTenPlayers: Participant[]
+): { tableA: Participant[]; tableB: Participant[] } {
+  if (topTenPlayers.length !== 10) {
+    throw new Error(`Final phase requires exactly 10 players, got ${topTenPlayers.length}`);
+  }
+
+  // Sort by score descending to ensure correct ranking
+  const sorted = [...topTenPlayers].sort((a, b) => b.score - a.score);
+  
+  // Table A: Odd positions (0, 2, 4, 6, 8) = Ranks 1, 3, 5, 7, 9
+  const tableA = [sorted[0], sorted[2], sorted[4], sorted[6], sorted[8]];
+  
+  // Table B: Even positions (1, 3, 5, 7, 9) = Ranks 2, 4, 6, 8, 10
+  const tableB = [sorted[1], sorted[3], sorted[5], sorted[7], sorted[9]];
+
+  return { tableA, tableB };
+}
+
+/**
  * Drop-in shim for callers expecting the old Participant[][] return type.
  */
 export function generateTablesCompat(

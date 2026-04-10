@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { PlayerScore, PlayerView, LoginFormData } from './types';
 import { churchColors, defaultChurchColor } from '../components/participants';
 
-const MAX_PHASES = 5;
+const MAX_PHASES = 6;
 
 function getChurchStyle(church: string) {
   return churchColors[church] || defaultChurchColor;
