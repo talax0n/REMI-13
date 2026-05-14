@@ -195,7 +195,7 @@ function EliminatedRow({ player, index }: { player: Player; index: number }) {
   );
 }
 
-// ─── Phase-5 layout: Top 20 active, eliminated below ───────────────────────
+// ─── Phase-5 layout: active semifinalists, eliminated below ────────────────
 function Phase5Layout({ active, eliminated }: { active: Player[]; eliminated: Player[] }) {
   const topTen = active.slice(0, 10);
   const nextTen = active.slice(10, 20);
@@ -210,7 +210,7 @@ function Phase5Layout({ active, eliminated }: { active: Player[]; eliminated: Pl
 
   return (
     <div className="flex-1 flex flex-col gap-3 overflow-hidden min-h-0">
-      {/* Active 20 players */}
+      {/* Active semifinalists */}
       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 shrink-0">
         {/* Top 10 */}
         <div className="w-full sm:w-72 flex flex-col gap-2 shrink-0">
@@ -268,7 +268,7 @@ function Phase5Layout({ active, eliminated }: { active: Player[]; eliminated: Pl
   );
 }
 
-// ─── Phase-6 layout: Top 10 active, eliminated below ───────────────────────
+// ─── Phase-6 layout: active finalists, eliminated below ────────────────────
 function Phase6Layout({ active, eliminated }: { active: Player[]; eliminated: Player[] }) {
   const colSize = Math.ceil(eliminated.length / 3);
   const elCols = [
@@ -279,9 +279,11 @@ function Phase6Layout({ active, eliminated }: { active: Player[]; eliminated: Pl
 
   return (
     <div className="flex-1 flex flex-col gap-3 overflow-hidden min-h-0">
-      {/* Top 10 */}
+      {/* Finalists */}
       <div className="w-full sm:w-96 mx-auto flex flex-col gap-2 shrink-0">
-        <h2 className="text-xs font-medium text-yellow-500 uppercase tracking-wider mb-1">Final — Top 10</h2>
+        <h2 className="text-xs font-medium text-yellow-500 uppercase tracking-wider mb-1">
+          Final — Top {active.length}
+        </h2>
         <div className="space-y-1">
           {active.map((player, index) => (
             <TopTenPlayer key={player.id} player={player} index={index} />
@@ -404,11 +406,14 @@ function DefaultLayout({ players }: { players: Player[] }) {
 }
 
 export default function LeaderboardScreen({ players, currentPhase = 1 }: LeaderboardScreenProps) {
-  const activeCutoff = currentPhase >= 6 ? 10 : currentPhase === 5 ? 20 : players.length;
   const isLatePhase = currentPhase >= 5;
 
-  const activePlayers = isLatePhase ? players.slice(0, activeCutoff) : players;
-  const eliminatedPlayers = isLatePhase ? players.slice(activeCutoff) : [];
+  const activePlayers = isLatePhase
+    ? players.filter((player) => player.status === 'active' || player.status === 'winner')
+    : players;
+  const eliminatedPlayers = isLatePhase
+    ? players.filter((player) => player.status === 'eliminated')
+    : [];
 
   const phaseLabel =
     currentPhase === 5
