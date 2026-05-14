@@ -59,13 +59,13 @@ function StatsCard({
   colorClass: string;
 }) {
   return (
-    <div className="bg-zinc-800/50 rounded-lg p-4 border border-white/5">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-zinc-500 uppercase tracking-wider">{title}</p>
-          <p className={`text-2xl font-bold ${colorClass}`}>{count}</p>
+    <div className="bg-zinc-800/50 rounded-lg p-2.5 sm:p-4 border border-white/5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider truncate">{title}</p>
+          <p className={`text-lg sm:text-2xl font-bold tabular-nums ${colorClass}`}>{count}</p>
         </div>
-        <Icon className={`w-8 h-8 ${colorClass} opacity-50`} />
+        <Icon className={`w-6 h-6 sm:w-8 sm:h-8 shrink-0 ${colorClass} opacity-50`} />
       </div>
     </div>
   );
@@ -273,7 +273,7 @@ export default function ParticipantTable({
 
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <Input
                 placeholder="Search by name..."
@@ -282,10 +282,10 @@ export default function ParticipantTable({
                 className="pl-10 bg-zinc-800/50 border-white/10 text-white placeholder:text-zinc-500"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-zinc-500" />
+            <div className="flex items-center gap-2 min-w-0">
+              <Filter className="w-4 h-4 text-zinc-500 shrink-0" />
               <Select value={teamFilter} onValueChange={setTeamFilter}>
-                <SelectTrigger className="w-[140px] bg-zinc-800/50 border-white/10 text-white">
+                <SelectTrigger className="flex-1 sm:w-[140px] sm:flex-none bg-zinc-800/50 border-white/10 text-white">
                   <SelectValue placeholder="Team" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-800 border-white/10">
@@ -304,7 +304,7 @@ export default function ParticipantTable({
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[140px] bg-zinc-800/50 border-white/10 text-white">
+                <SelectTrigger className="flex-1 sm:w-[140px] sm:flex-none bg-zinc-800/50 border-white/10 text-white">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-800 border-white/10">
@@ -390,8 +390,8 @@ export default function ParticipantTable({
           )}
 
           {/* Table */}
-          <div className="border border-white/10 rounded-lg overflow-hidden">
-            <Table>
+          <div className="border border-white/10 rounded-lg overflow-x-auto">
+            <Table className="min-w-[640px]">
               <TableHeader className="bg-zinc-800">
                 <TableRow className="border-white/10 hover:bg-transparent">
                   <TableHead className="w-10 text-center">

@@ -15,9 +15,10 @@ import { toast } from 'sonner';
 interface BulkImportUploaderProps {
   existingParticipants: AdminParticipant[];
   onImport: (participants: Omit<AdminParticipant, 'id'>[]) => Promise<void>;
+  bare?: boolean;
 }
 
-export default function BulkImportUploader({ existingParticipants, onImport }: BulkImportUploaderProps) {
+export default function BulkImportUploader({ existingParticipants, onImport, bare = false }: BulkImportUploaderProps) {
   const [status, setStatus] = useState<ImportStatus>('idle');
   const [importData, setImportData] = useState<ParticipantImportRow[]>([]);
   const [validation, setValidation] = useState<ImportValidation>({
@@ -156,21 +157,9 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
     setFileName('');
   };
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: 0.3 }}
-    >
-      <Card className="bg-zinc-900/50 border-white/10">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-white">
-            <FileSpreadsheet className="w-5 h-5 text-purple-500" />
-            Bulk Import
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <AnimatePresence mode="wait">
+  const body = (
+    <div className="space-y-4">
+      <AnimatePresence mode="wait">
             {status === 'idle' && (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -343,8 +332,26 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
                 </Button>
               </motion.div>
             )}
-          </AnimatePresence>
-        </CardContent>
+      </AnimatePresence>
+    </div>
+  );
+
+  if (bare) return body;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: 0.3 }}
+    >
+      <Card className="bg-zinc-900/50 border-white/10">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-white">
+            <FileSpreadsheet className="w-5 h-5 text-purple-500" />
+            Bulk Import
+          </CardTitle>
+        </CardHeader>
+        <CardContent>{body}</CardContent>
       </Card>
     </motion.div>
   );

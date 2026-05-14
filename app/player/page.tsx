@@ -288,12 +288,14 @@ function NotFoundView({ onBack }: { onBack: () => void }) {
 }
 
 // Player Profile View
-function PlayerProfile({ 
-  player, 
-  onBack 
-}: { 
-  player: PlayerScore; 
+function PlayerProfile({
+  player,
+  onBack,
+  tournamentPhase,
+}: {
+  player: PlayerScore;
   onBack: () => void;
+  tournamentPhase: number;
 }) {
   const teamStyle = getTeamStyle(player.team);
   const phases = Object.entries(player.scores).sort(([a], [b]) => parseInt(a) - parseInt(b));
@@ -399,7 +401,7 @@ function PlayerProfile({
             {Array.from({ length: MAX_PHASES }, (_, i) => i + 1).map((phaseNum, index) => {
               const phaseData = player.scores[phaseNum];
               const isCompleted = !!phaseData;
-              const isCurrent = !isCompleted && player.currentPhase === phaseNum;
+              const isCurrent = !isCompleted && tournamentPhase === phaseNum;
               const tableNum = isCompleted
                 ? phaseData.tableNumber
                 : isCurrent
@@ -545,6 +547,30 @@ export default function PlayerPage() {
   const [player, setPlayer] = useState<PlayerScore | null>(null);
   const [loading, setLoading] = useState(false);
   const [allPlayers, setAllPlayers] = useState<PlayerScore[]>([]);
+  const [tournamentPhase, setTournamentPhase] = useState(1);
+
+  // Poll tournament phase so the profile can highlight the active phase.
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchPhase() {
+      try {
+        const res = await fetch('/api/admin');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && data?.tournamentState?.phase) {
+          setTournamentPhase(data.tournamentState.phase);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    fetchPhase();
+    const interval = setInterval(fetchPhase, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   // Subscribe to the same live stream the leaderboard uses.
   // - Populates the name/team search from real player data.
@@ -619,7 +645,12 @@ export default function PlayerPage() {
       )}
 
       {view === 'profile' && player && (
-        <PlayerProfile key="profile" player={player} onBack={handleBack} />
+        <PlayerProfile
+          key="profile"
+          player={player}
+          onBack={handleBack}
+          tournamentPhase={tournamentPhase}
+        />
       )}
     </AnimatePresence>
   );

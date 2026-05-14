@@ -12,7 +12,7 @@ import TableScoring from './components/TableScoring';
 import PlayerQRCode from './components/PlayerQRCode';
 import { Button } from '@/components/ui/button';
 import { AdminParticipant, TournamentState } from './types';
-import { Download, QrCode, RotateCcw, SkipBack, Trash2, AlertTriangle, LogOut } from 'lucide-react';
+import { Download, QrCode, RotateCcw, SkipBack, Trash2, AlertTriangle, LogOut, MoreVertical, Users, Calculator, UserPlus, FileSpreadsheet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -75,6 +75,35 @@ function extractTeams(participants: AdminParticipant[]): string[] {
 
 type TabType = 'participants' | 'scoring';
 
+function MobileMenuItem({
+  icon: Icon,
+  label,
+  onClick,
+  tone,
+}: {
+  icon: React.ElementType;
+  label: string;
+  onClick: () => void;
+  tone?: 'amber' | 'red';
+}) {
+  const color =
+    tone === 'amber'
+      ? 'text-amber-400 hover:bg-amber-500/10'
+      : tone === 'red'
+        ? 'text-red-400 hover:bg-red-500/10'
+        : 'text-zinc-200 hover:bg-white/10';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${color}`}
+    >
+      <Icon className="w-4 h-4 shrink-0" />
+      <span>{label}</span>
+    </button>
+  );
+}
+
 export default function AdminPage() {
   const [participants, setParticipants] = useState<AdminParticipant[]>([]);
   const [tournamentState, setTournamentState] = useState<TournamentState>({
@@ -92,6 +121,9 @@ export default function AdminPage() {
   const [showResetWarning, setShowResetWarning] = useState(false);
   const [showPhaseBackWarning, setShowPhaseBackWarning] = useState(false);
   const [showResetAllScoresWarning, setShowResetAllScoresWarning] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showAddParticipant, setShowAddParticipant] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const [phaseScores, setPhaseScores] = useState<Record<string, Record<number, number>>>({});
@@ -649,7 +681,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0F1A]">
+    <div className="h-dvh flex flex-col bg-[#0B0F1A] overflow-y-auto">
       <Toaster 
         position="top-right" 
         toastOptions={{
@@ -661,60 +693,130 @@ export default function AdminPage() {
         }}
       />
       
-      {/* Header */}
-      <header className="border-b border-white/10 bg-[#0B0F1A]/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
+      {/* Mobile Header — centered logo + name, kebab menu for actions */}
+      <header className="sm:hidden sticky top-0 z-40 border-b border-white/10 bg-[#0B0F1A]/90 backdrop-blur-sm">
+        <div className="relative h-14 px-3 flex items-center justify-center">
+          <div className="flex items-center gap-2 min-w-0">
+            <img src="/LOGO.png" alt="Remi 13 Logo" className="w-8 h-8 rounded-xl object-contain shrink-0" />
+            <span className="text-base font-bold text-white truncate">Remi 13 Admin</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((v) => !v)}
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-9 h-9 rounded-full border border-white/10 bg-zinc-900 text-zinc-300 hover:text-white active:bg-white/10"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
+          {mobileMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setMobileMenuOpen(false)}
+              />
+              <div className="absolute right-3 top-full mt-2 z-50 w-64 bg-zinc-900 border border-white/10 rounded-xl shadow-xl shadow-black/40 p-2 space-y-1">
+                <div className="flex items-center justify-between gap-2 px-2 py-2 rounded-lg bg-zinc-800/60">
+                  <span className="text-[11px] uppercase tracking-wider text-zinc-500">Phase</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        setShowPhaseBackWarning(true);
+                      }}
+                      disabled={tournamentState.phase === 1}
+                      aria-label="Previous phase"
+                      className="inline-flex w-8 h-8 items-center justify-center rounded-md border border-white/10 text-white disabled:opacity-30 hover:bg-white/10"
+                    >
+                      <SkipBack className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-sm font-bold text-white tabular-nums">
+                      {tournamentState.phase} <span className="text-zinc-500">/ {tournamentState.maxPhases}</span>
+                    </span>
+                  </div>
+                </div>
+                <MobileMenuItem
+                  icon={QrCode}
+                  label="Player QR"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setShowQRCode(true);
+                  }}
+                />
+                <MobileMenuItem
+                  icon={Download}
+                  label="Export Excel"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleExportPairings();
+                  }}
+                />
+                <MobileMenuItem
+                  icon={RotateCcw}
+                  label="Reset DB"
+                  tone="amber"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setShowResetWarning(true);
+                  }}
+                />
+                <MobileMenuItem
+                  icon={Trash2}
+                  label="Reset all scores"
+                  tone="red"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setShowResetAllScoresWarning(true);
+                  }}
+                />
+                <MobileMenuItem
+                  icon={LogOut}
+                  label="Logout"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleLogout();
+                  }}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </header>
+
+      {/* Desktop Header */}
+      <header className="hidden sm:block border-b border-white/10 bg-[#0B0F1A]/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between gap-3">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="flex items-center gap-3"
+              className="flex items-center gap-3 min-w-0"
             >
-              <img src="/LOGO.png" alt="Remi 13 Logo" className="w-10 h-10 rounded-xl object-contain" />
-              <div>
-                <h1 className="text-xl font-bold text-white">Remi 13 Admin</h1>
+              <img src="/LOGO.png" alt="Remi 13 Logo" className="w-10 h-10 rounded-xl object-contain shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold text-white truncate">Remi 13 Admin</h1>
                 <p className="text-sm text-zinc-500">Tournament Control Panel</p>
               </div>
             </motion.div>
-            
+
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="flex items-center gap-4"
+              className="flex items-center gap-3"
             >
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLogout}
-                className="border-white/10 text-zinc-400 hover:bg-white/5 hover:text-white"
-              >
+              <Button variant="outline" size="sm" onClick={handleLogout} className="border-white/10 text-zinc-400 hover:bg-white/5 hover:text-white">
                 <LogOut className="w-4 h-4 mr-2" />
                 Logout
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowResetWarning(true)}
-                className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-              >
+              <Button variant="outline" size="sm" onClick={() => setShowResetWarning(true)} className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10">
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Reset DB
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowQRCode(true)}
-                className="border-white/10 text-white hover:bg-white/10"
-              >
+              <Button variant="outline" size="sm" onClick={() => setShowQRCode(true)} className="border-white/10 text-white hover:bg-white/10">
                 <QrCode className="w-4 h-4 mr-2" />
                 Player QR
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportPairings}
-                className="border-white/10 text-white hover:bg-white/10"
-              >
+              <Button variant="outline" size="sm" onClick={handleExportPairings} className="border-white/10 text-white hover:bg-white/10">
                 <Download className="w-4 h-4 mr-2" />
                 Export Excel
               </Button>
@@ -748,8 +850,8 @@ export default function AdminPage() {
         </div>
       </header>
 
-      {/* Navigation Tabs */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      {/* Desktop Navigation Tabs */}
+      <div className="hidden sm:block max-w-7xl mx-auto px-6 lg:px-8 py-4">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveTab('participants')}
@@ -775,7 +877,7 @@ export default function AdminPage() {
       </div>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 140px)' }}>
+      <main className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-28 sm:pb-6">
         <div className="pb-6">
           {activeTab === 'participants' ? (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -796,13 +898,34 @@ export default function AdminPage() {
                   onShuffle={handleShuffle}
                   onPhaseComplete={handlePhaseComplete}
                 />
-                <ParticipantForm
-                  onAddParticipant={handleAddParticipant}
-                />
-                <BulkImportUploader
-                  existingParticipants={participants}
-                  onImport={handleBulkImport}
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddParticipant(true)}
+                    className="group flex items-center gap-3 p-4 rounded-xl bg-zinc-900/50 border border-white/10 hover:border-emerald-500/40 hover:bg-zinc-800/60 active:scale-[0.99] transition text-left"
+                  >
+                    <div className="w-10 h-10 shrink-0 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center group-hover:bg-emerald-500/25">
+                      <UserPlus className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white">Add Participant</p>
+                      <p className="text-xs text-zinc-500">Create a single participant</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowBulkImport(true)}
+                    className="group flex items-center gap-3 p-4 rounded-xl bg-zinc-900/50 border border-white/10 hover:border-purple-500/40 hover:bg-zinc-800/60 active:scale-[0.99] transition text-left"
+                  >
+                    <div className="w-10 h-10 shrink-0 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center group-hover:bg-purple-500/25">
+                      <FileSpreadsheet className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white">Bulk Import</p>
+                      <p className="text-xs text-zinc-500">Upload Excel / CSV</p>
+                    </div>
+                  </button>
+                </div>
               </div>
 
               {/* Right Column - Participants Table */}
@@ -826,6 +949,51 @@ export default function AdminPage() {
           )}
         </div>
       </main>
+
+      {/* Add Participant Dialog */}
+      <Dialog open={showAddParticipant} onOpenChange={setShowAddParticipant}>
+        <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-emerald-500" />
+              Add Participant
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Create a single participant entry.
+            </DialogDescription>
+          </DialogHeader>
+          <ParticipantForm
+            bare
+            onAddParticipant={async (name, team) => {
+              await handleAddParticipant(name, team);
+              setShowAddParticipant(false);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Import Dialog */}
+      <Dialog open={showBulkImport} onOpenChange={setShowBulkImport}>
+        <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5 text-purple-500" />
+              Bulk Import
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Upload a CSV or XLSX file with columns: name, team.
+            </DialogDescription>
+          </DialogHeader>
+          <BulkImportUploader
+            bare
+            existingParticipants={participants}
+            onImport={async (parts) => {
+              await handleBulkImport(parts);
+              setShowBulkImport(false);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* QR Code Dialog */}
       <PlayerQRCode 
@@ -938,6 +1106,37 @@ export default function AdminPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Mobile floating bottom tab bar */}
+      <div
+        className="sm:hidden fixed inset-x-0 z-50 px-4 pointer-events-none"
+        style={{ bottom: `max(0.75rem, env(safe-area-inset-bottom))` }}
+      >
+        <div className="mx-auto w-fit pointer-events-auto flex items-center gap-1 p-1 rounded-full bg-zinc-900/90 backdrop-blur border border-white/10 shadow-lg shadow-black/40">
+          {[
+            { id: 'participants' as TabType, label: 'Participants', icon: Users },
+            { id: 'scoring' as TabType, label: 'Scoring', icon: Calculator },
+          ].map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                aria-label={item.label}
+                className={`flex items-center gap-2 h-10 px-4 rounded-full text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-white text-black'
+                    : 'text-zinc-300 hover:text-white active:bg-white/10'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

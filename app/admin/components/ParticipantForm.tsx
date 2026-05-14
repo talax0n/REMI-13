@@ -12,9 +12,10 @@ import { toast } from 'sonner';
 
 interface ParticipantFormProps {
   onAddParticipant: (name: string, team: string) => Promise<void>;
+  bare?: boolean;
 }
 
-export default function ParticipantForm({ onAddParticipant }: ParticipantFormProps) {
+export default function ParticipantForm({ onAddParticipant, bare = false }: ParticipantFormProps) {
   const [name, setName] = useState('');
   const [team, setTeam] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -43,6 +44,45 @@ export default function ParticipantForm({ onAddParticipant }: ParticipantFormPro
     }
   };
 
+  const form = (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="name" className="text-zinc-300">Name</Label>
+        <Input
+          id="name"
+          placeholder="Enter participant name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="bg-zinc-800/50 border-white/10 text-white placeholder:text-zinc-500"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="team" className="text-zinc-300">Team</Label>
+        <Input
+          id="team"
+          placeholder="Enter team name"
+          value={team}
+          onChange={(e) => setTeam(e.target.value)}
+          className="bg-zinc-800/50 border-white/10 text-white placeholder:text-zinc-500"
+        />
+      </div>
+
+      <Separator className="bg-white/10" />
+
+      <Button
+        type="submit"
+        disabled={isLoading || !name.trim() || !team}
+        className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50"
+      >
+        <Plus className="w-4 h-4 mr-2" />
+        {isLoading ? 'Adding...' : 'Add Participant'}
+      </Button>
+    </form>
+  );
+
+  if (bare) return form;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -56,42 +96,7 @@ export default function ParticipantForm({ onAddParticipant }: ParticipantFormPro
             Add Participant
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-zinc-300">Name</Label>
-              <Input
-                id="name"
-                placeholder="Enter participant name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="bg-zinc-800/50 border-white/10 text-white placeholder:text-zinc-500"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="team" className="text-zinc-300">Team</Label>
-              <Input
-                id="team"
-                placeholder="Enter team name"
-                value={team}
-                onChange={(e) => setTeam(e.target.value)}
-                className="bg-zinc-800/50 border-white/10 text-white placeholder:text-zinc-500"
-              />
-            </div>
-
-            <Separator className="bg-white/10" />
-
-            <Button
-              type="submit"
-              disabled={isLoading || !name.trim() || !team}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              {isLoading ? 'Adding...' : 'Add Participant'}
-            </Button>
-          </form>
-        </CardContent>
+        <CardContent>{form}</CardContent>
       </Card>
     </motion.div>
   );
