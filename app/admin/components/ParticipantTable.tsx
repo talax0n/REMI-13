@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Filter, Users, ChevronUp, ChevronDown, Trash2, Edit2, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, Users, ChevronUp, ChevronDown, Trash2, Edit2, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Archive, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +32,7 @@ interface ParticipantTableProps {
   teams: string[];
   isLoading?: boolean;
   onDelete?: (id: string) => Promise<void>;
+  onArchive?: (id: string, archived: boolean) => Promise<void>;
   onEdit?: (participant: AdminParticipant) => void;
   onToggleActive?: (id: string, active: boolean) => Promise<void>;
 }
@@ -73,6 +74,7 @@ export default function ParticipantTable({
   teams,
   isLoading = false,
   onDelete,
+  onArchive,
   onEdit,
   onToggleActive,
 }: ParticipantTableProps) {
@@ -87,8 +89,9 @@ export default function ParticipantTable({
   // Calculate stats
   const stats = useMemo(() => {
     const active = participants.filter(p => p.status === 'active').length;
-    const inactive = participants.filter(p => p.status !== 'active').length;
-    return { active, inactive, total: participants.length };
+    const archived = participants.filter(p => p.status === 'archived').length;
+    const inactive = participants.filter(p => p.status !== 'active' && p.status !== 'archived').length;
+    return { active, inactive, archived, total: participants.length };
   }, [participants]);
 
   const handleSort = (field: SortField) => {
@@ -117,9 +120,11 @@ export default function ParticipantTable({
 
     // Filter by status
     if (statusFilter && statusFilter !== 'all') {
-      result = result.filter((p) => 
-        statusFilter === 'active' ? p.status === 'active' : p.status !== 'active'
-      );
+      result = result.filter((p) => {
+        if (statusFilter === 'active') return p.status === 'active';
+        if (statusFilter === 'archived') return p.status === 'archived';
+        return p.status !== 'active' && p.status !== 'archived';
+      });
     }
 
     // Sort
@@ -198,12 +203,18 @@ export default function ParticipantTable({
               colorClass="text-emerald-400"
             />
             <StatsCard
-              title="Inactive (Unpaid)"
+              title="Inactive"
               count={stats.inactive}
               icon={XCircle}
               colorClass="text-rose-400"
             />
           </div>
+          {stats.archived > 0 && (
+            <div className="bg-zinc-800/50 rounded-lg p-3 border border-white/5 flex items-center justify-between">
+              <span className="text-xs text-zinc-500 uppercase tracking-wider">Archived</span>
+              <span className="text-sm font-bold text-zinc-300">{stats.archived}</span>
+            </div>
+          )}
 
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-3">
@@ -250,6 +261,9 @@ export default function ParticipantTable({
                   </SelectItem>
                   <SelectItem value="inactive" className="text-white hover:bg-zinc-700">
                     Inactive (Unpaid)
+                  </SelectItem>
+                  <SelectItem value="archived" className="text-white hover:bg-zinc-700">
+                    Archived
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -331,10 +345,11 @@ export default function ParticipantTable({
                   paginatedParticipants.map((participant) => {
                     const teamStyle = getTeamStyle(participant.team);
                     const isActive = participant.status === 'active';
+                    const isArchived = participant.status === 'archived';
                     return (
                       <TableRow
                         key={participant.id}
-                        className="border-white/5 hover:bg-white/[0.02]"
+                        className={`border-white/5 hover:bg-white/[0.02] ${isArchived ? 'opacity-50' : ''}`}
                       >
                         <TableCell className="font-medium text-white">
                           {participant.name}
@@ -356,6 +371,7 @@ export default function ParticipantTable({
                           <div className="flex items-center justify-center">
                             <Switch
                               checked={isActive}
+                              disabled={isArchived}
                               onCheckedChange={(checked: boolean) => 
                                 onToggleActive?.(participant.id, checked)
                               }
@@ -381,8 +397,24 @@ export default function ParticipantTable({
                                 size="icon"
                                 onClick={() => onDelete(participant.id)}
                                 className="h-8 w-8 text-zinc-400 hover:text-red-400"
+                                title="Delete participant"
                               >
                                 <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {onArchive && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onArchive(participant.id, !isArchived)}
+                                className="h-8 w-8 text-zinc-400 hover:text-cyan-400"
+                                title={isArchived ? 'Restore participant' : 'Archive participant'}
+                              >
+                                {isArchived ? (
+                                  <RotateCcw className="w-4 h-4" />
+                                ) : (
+                                  <Archive className="w-4 h-4" />
+                                )}
                               </Button>
                             )}
                           </div>

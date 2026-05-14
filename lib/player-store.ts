@@ -50,7 +50,9 @@ export async function getPlayerScores(): Promise<PlayerScore[]> {
 
 export async function getLeaderboard(): Promise<PlayerScore[]> {
   const rows = await query<PlayerRow>(
-    'SELECT * FROM players ORDER BY total_score DESC, current_table ASC NULLS LAST, name ASC'
+    `SELECT * FROM players
+     WHERE status <> 'archived'
+     ORDER BY total_score DESC, current_table ASC NULLS LAST, name ASC`
   );
   return rows.map(rowToPlayerScore);
 }
@@ -60,10 +62,17 @@ export async function getPlayerByNameAndTeam(
   team: string
 ): Promise<PlayerScore | null> {
   const rows = await query<PlayerRow>(
-    'SELECT * FROM players WHERE LOWER(name) = LOWER($1) AND LOWER(team) = LOWER($2)',
+    `SELECT * FROM players
+     WHERE LOWER(name) = LOWER($1)
+       AND LOWER(team) = LOWER($2)
+       AND status <> 'archived'`,
     [name, team]
   );
   return rows.length > 0 ? rowToPlayerScore(rows[0]) : null;
+}
+
+export async function deletePlayer(playerId: string): Promise<void> {
+  await query('DELETE FROM players WHERE id = $1', [playerId]);
 }
 
 export async function updatePlayerPhaseScore(

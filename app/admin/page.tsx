@@ -139,10 +139,15 @@ export default function AdminPage() {
         matchesPlayed: 0,
         status: 'active',
       };
-      setParticipants((prev) => [...prev, newParticipant]);
-      updateTournamentStats();
+      const nextParticipants = [...participants, newParticipant];
+      setParticipants(nextParticipants);
+      setTournamentState((prev) => ({
+        ...prev,
+        totalParticipants: nextParticipants.filter((p) => p.status === 'active').length,
+        totalTables: Math.ceil(nextParticipants.filter((p) => p.status === 'active').length / 5),
+      }));
     },
-    [updateTournamentStats]
+    [participants]
   );
 
   // Bulk import participants
@@ -152,10 +157,16 @@ export default function AdminPage() {
         ...p,
         id: `participant-${Date.now()}-${index}`,
       }));
-      setParticipants((prev) => [...prev, ...participantsWithIds]);
-      updateTournamentStats();
+      const nextParticipants = [...participants, ...participantsWithIds];
+      const activeCount = nextParticipants.filter((p) => p.status === 'active').length;
+      setParticipants(nextParticipants);
+      setTournamentState((prev) => ({
+        ...prev,
+        totalParticipants: activeCount,
+        totalTables: Math.ceil(activeCount / 5),
+      }));
     },
-    [updateTournamentStats]
+    [participants]
   );
 
   // Shuffle tables
@@ -432,21 +443,60 @@ export default function AdminPage() {
     toast.success('Database reset');
   }, []);
 
-  // Delete participant
   const handleDeleteParticipant = useCallback(async (id: string) => {
-    setParticipants((prev) => prev.filter((p) => p.id !== id));
-    updateTournamentStats();
-  }, [updateTournamentStats]);
+    const response = await fetch(`/api/admin/player?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      toast.error('Failed to delete participant');
+      return;
+    }
+
+    const nextParticipants = participants.filter((p) => p.id !== id);
+    const activeCount = nextParticipants.filter((p) => p.status === 'active').length;
+    setParticipants(nextParticipants);
+    setTournamentState((prev) => ({
+      ...prev,
+      totalParticipants: activeCount,
+      totalTables: Math.ceil(activeCount / 5),
+    }));
+    toast.success('Participant deleted');
+  }, [participants]);
+
+  const handleArchiveParticipant = useCallback(async (id: string, archived: boolean) => {
+    const nextParticipants = participants.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              status: archived ? 'archived' as const : 'active' as const,
+              tableNumber: archived ? undefined : p.tableNumber,
+            }
+          : p
+      );
+    const activeCount = nextParticipants.filter((p) => p.status === 'active').length;
+    setParticipants(nextParticipants);
+    setTournamentState((prev) => ({
+      ...prev,
+      totalParticipants: activeCount,
+      totalTables: Math.ceil(activeCount / 5),
+    }));
+    toast.success(archived ? 'Participant archived' : 'Participant restored');
+  }, [participants]);
 
   // Toggle participant active status (registration fee paid)
   const handleToggleActive = useCallback(async (id: string, active: boolean) => {
-    setParticipants((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, status: active ? 'active' : 'eliminated' } : p
-      )
-    );
-    updateTournamentStats();
-  }, [updateTournamentStats]);
+    const nextParticipants = participants.map((p) =>
+        p.id === id ? { ...p, status: active ? 'active' as const : 'eliminated' as const } : p
+      );
+    const activeCount = nextParticipants.filter((p) => p.status === 'active').length;
+    setParticipants(nextParticipants);
+    setTournamentState((prev) => ({
+      ...prev,
+      totalParticipants: activeCount,
+      totalTables: Math.ceil(activeCount / 5),
+    }));
+  }, [participants]);
 
   // Save scores from table scoring with phase tracking
   const handleSaveScores = useCallback(async (updates: { id: string; score: number; phase: number }[]) => {
@@ -508,16 +558,13 @@ export default function AdminPage() {
           body: JSON.stringify({ participants }),
         }).catch(console.error),
       ];
-      // Only push tables when we have complete tables to show
-      if (tables.length > 0) {
-        fetches.push(
-          fetch('/api/tables', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(tables),
-          }).catch(console.error)
-        );
-      }
+      fetches.push(
+        fetch('/api/tables', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(tables),
+        }).catch(console.error)
+      );
       await Promise.all(fetches);
     };
     sync();
@@ -693,6 +740,7 @@ export default function AdminPage() {
                   participants={participants}
                   teams={teams}
                   onDelete={handleDeleteParticipant}
+                  onArchive={handleArchiveParticipant}
                   onToggleActive={handleToggleActive}
                 />
               </div>

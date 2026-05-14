@@ -10,7 +10,7 @@ export interface PlayerScore {
   team: string;
   scores: Record<number, PhaseScore>; // phase number -> score
   totalScore: number;
-  status: 'active' | 'eliminated' | 'winner';
+  status: 'active' | 'eliminated' | 'winner' | 'archived';
   currentPhase?: number;
   currentTable?: number;
   rank?: number;
