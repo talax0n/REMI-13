@@ -9,11 +9,21 @@ interface TableRow {
 
 type StoredPlayer = Table['players'][number] & { church?: string; team?: string };
 
+export interface PrintableTablePairing {
+  id: string;
+  number: number;
+  players: Table['players'];
+}
+
 function normalizeStoredPlayers(players: StoredPlayer[]): Table['players'] {
   return players.map(({ church, ...player }) => ({
     ...player,
     team: player.team ?? church ?? '',
   }));
+}
+
+function isPrintablePlayer(player: Table['players'][number]): boolean {
+  return !player.isDummy && player.status !== 'dummy' && !player.id.startsWith('dummy-');
 }
 
 export async function getTables(): Promise<Table[]> {
@@ -22,6 +32,15 @@ export async function getTables(): Promise<Table[]> {
     id: r.id,
     number: r.number,
     players: normalizeStoredPlayers(r.players as StoredPlayer[]),
+  }));
+}
+
+export async function getPrintableTablePairings(): Promise<PrintableTablePairing[]> {
+  const tables = await getTables();
+  return tables.map((table) => ({
+    id: table.id,
+    number: table.number,
+    players: table.players.filter(isPrintablePlayer),
   }));
 }
 

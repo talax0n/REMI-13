@@ -12,7 +12,7 @@ import TableScoring from './components/TableScoring';
 import PlayerQRCode from './components/PlayerQRCode';
 import { Button } from '@/components/ui/button';
 import { AdminParticipant, TournamentState } from './types';
-import { QrCode, RotateCcw, SkipBack, Trash2, AlertTriangle, LogOut } from 'lucide-react';
+import { Download, QrCode, RotateCcw, SkipBack, Trash2, AlertTriangle, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -401,6 +401,10 @@ export default function AdminPage() {
     router.replace('/admin/login');
   }, [router]);
 
+  const handleExportPairings = useCallback(() => {
+    window.location.href = '/api/admin/tables/export';
+  }, []);
+
   const handleResetDatabase = useCallback(async () => {
     const response = await fetch('/api/admin', {
       method: 'POST',
@@ -425,7 +429,7 @@ export default function AdminPage() {
       body: JSON.stringify([]),
     }).catch(console.error);
 
-    toast.success('Database reset with latest participant seed');
+    toast.success('Database reset');
   }, []);
 
   // Delete participant
@@ -587,6 +591,15 @@ export default function AdminPage() {
               >
                 <QrCode className="w-4 h-4 mr-2" />
                 Player QR
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportPairings}
+                className="border-white/10 text-white hover:bg-white/10"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export Excel
               </Button>
               <div className="flex items-center gap-2">
                 <Button
