@@ -8,6 +8,7 @@
     "app/api/tables/route.ts": { "maxDuration": 30 },
     "app/api/admin/tables/export/route.ts": { "maxDuration": 30 },
     "app/api/admin/player/route.ts": { "maxDuration": 10 },
+    "app/api/admin/participants/parse/route.ts": { "maxDuration": 30 },
     "app/api/admin/auth/route.ts": { "maxDuration": 10 }
   }
 }

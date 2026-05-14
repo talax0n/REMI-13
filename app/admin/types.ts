@@ -35,3 +35,8 @@ export interface ImportValidation {
   duplicates: string[];
   missingFields: string[];
 }
+
+export interface ParticipantImportRow {
+  name: string;
+  team: string;
+}

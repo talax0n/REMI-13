@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { AdminParticipant, ImportStatus, ImportValidation } from '../types';
+import { AdminParticipant, ImportStatus, ImportValidation, ParticipantImportRow } from '../types';
 import { toast } from 'sonner';
 
 interface BulkImportUploaderProps {
@@ -17,14 +17,9 @@ interface BulkImportUploaderProps {
   onImport: (participants: Omit<AdminParticipant, 'id'>[]) => Promise<void>;
 }
 
-interface CSVRow {
-  name: string;
-  team: string;
-}
-
 export default function BulkImportUploader({ existingParticipants, onImport }: BulkImportUploaderProps) {
   const [status, setStatus] = useState<ImportStatus>('idle');
-  const [previewData, setPreviewData] = useState<CSVRow[]>([]);
+  const [importData, setImportData] = useState<ParticipantImportRow[]>([]);
   const [validation, setValidation] = useState<ImportValidation>({
     valid: true,
     errors: [],
@@ -33,32 +28,18 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
   });
   const [fileName, setFileName] = useState<string>('');
 
-  const parseCSV = (content: string): CSVRow[] => {
-    const lines = content.trim().split('\n');
-    const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
-    const nameIndex = headers.indexOf('name');
-    const teamIndex = headers.indexOf('team');
-    const legacyChurchIndex = headers.indexOf('church');
-    const groupingIndex = teamIndex !== -1 ? teamIndex : legacyChurchIndex;
-
-    if (nameIndex === -1 || groupingIndex === -1) {
-      throw new Error('CSV must have "name" and "team" columns');
-    }
-
-    return lines.slice(1).map((line) => {
-      const values = line.split(',').map(v => v.trim());
-      return {
-        name: values[nameIndex] || '',
-        team: values[groupingIndex] || '',
-      };
-    }).filter(row => row.name || row.team);
-  };
-
-  const validateData = (data: CSVRow[]): ImportValidation => {
+  const validateData = (data: ParticipantImportRow[]): ImportValidation => {
     const errors: string[] = [];
     const duplicates: string[] = [];
     const missingFields: string[] = [];
-    const existingNames = new Set(existingParticipants.map(p => p.name.toLowerCase()));
+    const existingKeys = new Set(
+      existingParticipants.map(p => `${p.name.toLowerCase()}::${p.team.toLowerCase()}`)
+    );
+    const importKeys = new Set<string>();
+
+    if (data.length === 0) {
+      errors.push('No participant rows found');
+    }
 
     data.forEach((row, index) => {
       const rowNum = index + 2;
@@ -70,13 +51,18 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
         missingFields.push(`Row ${rowNum}: Missing team`);
       }
       
-      if (row.name && existingNames.has(row.name.toLowerCase())) {
-        duplicates.push(row.name);
+      const key = `${row.name.toLowerCase()}::${row.team.toLowerCase()}`;
+      if (row.name && row.team && existingKeys.has(key)) {
+        duplicates.push(`${row.name} (${row.team})`);
       }
+      if (row.name && row.team && importKeys.has(key)) {
+        duplicates.push(`Row ${rowNum}: ${row.name} (${row.team})`);
+      }
+      importKeys.add(key);
     });
 
     return {
-      valid: errors.length === 0 && missingFields.length === 0,
+      valid: errors.length === 0 && duplicates.length === 0 && missingFields.length === 0,
       errors,
       duplicates,
       missingFields,
@@ -84,8 +70,8 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
   };
 
   async function processFile(file: File) {
-    if (!file.name.endsWith('.csv')) {
-      toast.error('Invalid file type', { description: 'Please upload a CSV file' });
+    if (!/\.(csv|xlsx)$/i.test(file.name)) {
+      toast.error('Invalid file type', { description: 'Please upload a CSV or XLSX file' });
       return;
     }
 
@@ -93,11 +79,22 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
     setFileName(file.name);
 
     try {
-      const content = await file.text();
-      const data = parseCSV(content);
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch('/api/admin/participants/parse', {
+        method: 'POST',
+        body: formData,
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error ?? 'Failed to parse upload file');
+      }
+
+      const data = result.rows as ParticipantImportRow[];
       const validationResult = validateData(data);
       
-      setPreviewData(data.slice(0, 10)); // Preview first 10
+      setImportData(data);
       setValidation(validationResult);
       setStatus('preview');
 
@@ -107,7 +104,7 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
         });
       }
     } catch (error) {
-      toast.error('Failed to parse CSV', {
+      toast.error('Failed to parse upload file', {
         description: error instanceof Error ? error.message : 'Unknown error',
       });
       setStatus('error');
@@ -129,7 +126,7 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
     setStatus('importing');
     
     try {
-      const participants = previewData.map(row => ({
+      const participants = importData.map(row => ({
         name: row.name,
         team: row.team,
         score: 0,
@@ -144,9 +141,9 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
       });
       
       setStatus('success');
-      setPreviewData([]);
+      setImportData([]);
       setFileName('');
-    } catch (error) {
+    } catch {
       toast.error('Import failed');
       setStatus('error');
     }
@@ -154,7 +151,7 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
 
   const resetUpload = () => {
     setStatus('idle');
-    setPreviewData([]);
+    setImportData([]);
     setValidation({ valid: true, errors: [], duplicates: [], missingFields: [] });
     setFileName('');
   };
@@ -187,15 +184,15 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
                 >
                   <input
                     type="file"
-                    accept=".csv"
+                    accept=".csv,.xlsx"
                     onChange={handleFileSelect}
                     className="hidden"
-                    id="csv-upload"
+                    id="participant-upload"
                   />
-                  <label htmlFor="csv-upload" className="cursor-pointer">
+                  <label htmlFor="participant-upload" className="cursor-pointer">
                     <Upload className="w-12 h-12 text-zinc-500 mx-auto mb-4" />
                     <p className="text-lg font-medium text-white mb-2">
-                      Drop CSV file here or click to upload
+                      Drop CSV or XLSX file here or click to upload
                     </p>
                     <p className="text-sm text-zinc-500">
                       Required columns: name, team
@@ -218,7 +215,7 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
                     <FileSpreadsheet className="w-5 h-5 text-purple-500" />
                     <span className="text-white font-medium">{fileName}</span>
                     <Badge variant="secondary" className="bg-zinc-700">
-                      {previewData.length} rows
+                      {importData.length} rows
                     </Badge>
                   </div>
                   <Button
@@ -237,6 +234,15 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
                     <AlertCircle className="w-4 h-4" />
                     <AlertDescription>
                       {validation.duplicates.length} duplicate names found
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {validation.errors.length > 0 && (
+                  <Alert className="bg-red-500/10 border-red-500/30 text-red-400">
+                    <AlertCircle className="w-4 h-4" />
+                    <AlertDescription>
+                      {validation.errors.join(', ')}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -260,7 +266,7 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {previewData.map((row, index) => (
+                      {importData.slice(0, 10).map((row, index) => (
                         <TableRow key={index} className="border-white/5">
                           <TableCell className="text-white">{row.name}</TableCell>
                           <TableCell className="text-zinc-400">{row.team}</TableCell>
@@ -269,6 +275,11 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
                     </TableBody>
                   </Table>
                 </div>
+                {importData.length > 10 && (
+                  <p className="text-xs text-zinc-500">
+                    Showing first 10 of {importData.length} rows. All valid rows will be imported.
+                  </p>
+                )}
 
                 <Separator className="bg-white/10" />
 
@@ -310,7 +321,7 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
                 className="flex flex-col items-center justify-center py-12"
               >
                 <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
-                <p className="text-white font-medium">Validating CSV...</p>
+                <p className="text-white font-medium">Validating upload...</p>
               </motion.div>
             )}
 
