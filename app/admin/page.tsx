@@ -103,6 +103,17 @@ export default function AdminPage() {
   const syncEnabled = useRef(false);
 
   const teams = useMemo(() => extractTeams(participants), [participants]);
+  const currentPhaseHasScores = useMemo(() => {
+    const seatedActive = participants.filter(
+      (p) => p.status === 'active' && p.tableNumber !== undefined
+    );
+    return seatedActive.length > 0 && seatedActive.every(
+      (p) => phaseScores[p.id]?.[tournamentState.phase] !== undefined
+    );
+  }, [participants, phaseScores, tournamentState.phase]);
+  const shuffleTargetPhase = currentPhaseHasScores
+    ? Math.min(tournamentState.phase + 1, tournamentState.maxPhases)
+    : tournamentState.phase;
 
   const persistTournamentState = useCallback((
     next: TournamentState,
@@ -198,8 +209,8 @@ export default function AdminPage() {
     await new Promise((resolve) => setTimeout(resolve, 1500));
     const participantsWithCurrentHistory = recordTableOpponentHistory(participants);
 
-    // Phase 5 → Final (top 5 or 10, using the same pairing constraints)
-    if (tournamentState.phase === 5) {
+    // Target phase 6 → Final (top 5 or 10, using the same pairing constraints)
+    if (shuffleTargetPhase === 6) {
       const sorted = [...participantsWithCurrentHistory]
         .filter((p) => p.status === 'active')
         .sort((a, b) => b.score - a.score);
@@ -256,8 +267,8 @@ export default function AdminPage() {
       return { warnings: shuffleResult.warnings };
     }
 
-    // Phase 4 → Semifinal (top 10 or 20)
-    if (tournamentState.phase === 4) {
+    // Target phase 5 → Semifinal (top 10 or 20)
+    if (shuffleTargetPhase === 5) {
       const sorted = [...participantsWithCurrentHistory]
         .filter((p) => p.status === 'active')
         .sort((a, b) => b.score - a.score);
@@ -307,7 +318,7 @@ export default function AdminPage() {
       return { warnings: shuffleResult.warnings };
     }
 
-    // Phases 1–3 → regular reshuffle. Unpaid/inactive players stay on the roster
+    // Phases 1–4 → regular reshuffle. Unpaid/inactive players stay on the roster
     // but are excluded from pairing.
     const allActive = participantsWithCurrentHistory
       .filter((p) => p.status === 'active')
@@ -369,15 +380,15 @@ export default function AdminPage() {
 
     setParticipants(updated);
     return { warnings };
-  }, [finalCutoff, participants, semifinalCutoff, tournamentState.phase]);
+  }, [finalCutoff, participants, semifinalCutoff, shuffleTargetPhase]);
 
-  // Complete phase and advance
-  const handlePhaseComplete = useCallback(() => {
+  // Mark generated phase as active.
+  const handlePhaseComplete = useCallback((targetPhase: number) => {
     setTournamentState((prev) => {
       const next = {
         ...prev,
-        phase: Math.min(prev.phase + 1, prev.maxPhases),
-        status: (prev.phase + 1 >= prev.maxPhases ? 'completed' : 'waiting') as TournamentState['status'],
+        phase: targetPhase,
+        status: 'in_progress' as TournamentState['status'],
       };
       persistTournamentState(next);
       return next;
@@ -761,6 +772,7 @@ export default function AdminPage() {
                 />
                 <ShuffleControl
                   state={tournamentState}
+                  targetPhase={shuffleTargetPhase}
                   semifinalCutoff={semifinalCutoff}
                   finalCutoff={finalCutoff}
                   onSemifinalCutoffChange={handleSemifinalCutoffChange}

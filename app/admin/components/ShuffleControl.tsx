@@ -19,16 +19,18 @@ import { toast } from 'sonner';
 
 interface ShuffleControlProps {
   state: TournamentState;
+  targetPhase: number;
   semifinalCutoff: 10 | 20;
   finalCutoff: 5 | 10;
   onSemifinalCutoffChange: (cutoff: 10 | 20) => void;
   onFinalCutoffChange: (cutoff: 5 | 10) => void;
   onShuffle: () => Promise<{ warnings: string[] }>;
-  onPhaseComplete: () => void;
+  onPhaseComplete: (targetPhase: number) => void;
 }
 
 export default function ShuffleControl({
   state,
+  targetPhase,
   semifinalCutoff,
   finalCutoff,
   onSemifinalCutoffChange,
@@ -67,9 +69,9 @@ export default function ShuffleControl({
     try {
       const result = await onShuffle();
       const label =
-        state.phase === 4 ? `Semifinal (Top ${semifinalCutoff})` :
-        state.phase === 5 ? `Final (Top ${finalCutoff})` :
-        `Fase ${state.phase + 1}`;
+        targetPhase === 5 ? `Semifinal (Top ${semifinalCutoff})` :
+        targetPhase === 6 ? `Final (Top ${finalCutoff})` :
+        `Fase ${targetPhase}`;
       toast.success('Meja berhasil dibuat', {
         id: 'shuffle',
         description: `Meja untuk ${label} sudah siap.`,
@@ -77,7 +79,7 @@ export default function ShuffleControl({
       result.warnings.forEach((warning) => {
         toast.warning('Catatan pairing', { description: warning });
       });
-      onPhaseComplete();
+      onPhaseComplete(targetPhase);
     } catch (error) {
       toast.error('Gagal membuat meja', {
         id: 'shuffle',
@@ -176,15 +178,15 @@ export default function ShuffleControl({
               Konfirmasi Generate Meja
             </DialogTitle>
             <DialogDescription className="text-zinc-400">
-              {state.phase === 4
+              {targetPhase === 5
                 ? `Akan memilih ${semifinalCutoff} pemain teratas untuk Semifinal (Fase 5).`
-                : state.phase === 5
+                : targetPhase === 6
                 ? `Akan memilih ${finalCutoff} pemain teratas untuk Final (Fase 6).`
-                : `Akan men-shuffle meja untuk Fase ${state.phase + 1}.`}
+                : `Akan men-shuffle meja untuk Fase ${targetPhase}.`}
             </DialogDescription>
           </DialogHeader>
 
-          {state.phase === 4 && (
+          {targetPhase === 5 && (
             <div className="space-y-2">
               <p className="text-sm font-medium text-zinc-300">Semifinal cutoff</p>
               <div className="grid grid-cols-2 gap-2">
@@ -203,7 +205,7 @@ export default function ShuffleControl({
             </div>
           )}
 
-          {state.phase === 5 && (
+          {targetPhase === 6 && (
             <div className="space-y-2">
               <p className="text-sm font-medium text-zinc-300">Final cutoff</p>
               <div className="grid grid-cols-2 gap-2">
@@ -225,9 +227,9 @@ export default function ShuffleControl({
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 my-4">
             <p className="text-sm text-yellow-400">
               <strong>Peringatan:</strong>{' '}
-              {state.phase === 4
+              {targetPhase === 5
                 ? `Pemain di luar Top ${semifinalCutoff} akan dieliminasi.`
-                : state.phase === 5
+                : targetPhase === 6
                 ? `Pemain di luar Top ${finalCutoff} akan dieliminasi.`
                 : 'Semua penugasan meja saat ini akan diganti.'}
             </p>
