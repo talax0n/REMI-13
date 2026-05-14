@@ -51,7 +51,7 @@ export default function PlayerQRCode({ isOpen, onClose }: PlayerQRCodeProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-sm w-[90vw] p-4 sm:p-6 overflow-x-hidden">
+      <DialogContent className="bg-zinc-900 border-white/10 text-white w-[calc(100vw-2rem)] max-w-sm p-4 sm:p-6 overflow-x-hidden">
         <DialogHeader className="space-y-2">
           <DialogTitle className="text-lg sm:text-xl font-bold flex items-center gap-2">
             <QrCode className="w-5 h-5 text-emerald-400" />
@@ -107,22 +107,22 @@ export default function PlayerQRCode({ isOpen, onClose }: PlayerQRCodeProps) {
           </div>
 
           {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 min-w-0">
             <Button
               variant="outline"
               onClick={handleDownload}
               disabled={!qrDataUrl}
-              className="flex-1 border-white/10 text-white hover:bg-white/10 h-10 sm:h-11"
+              className="flex-1 min-w-0 border-white/10 text-white hover:bg-white/10 h-10 sm:h-11"
             >
-              <Download className="w-4 h-4 mr-2" />
-              Download
+              <Download className="w-4 h-4 mr-2 shrink-0" />
+              <span className="truncate">Download</span>
             </Button>
             <Button
               onClick={handleCopyLink}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-500 h-10 sm:h-11"
+              className="flex-1 min-w-0 bg-emerald-600 hover:bg-emerald-500 h-10 sm:h-11"
             >
-              <Share2 className="w-4 h-4 mr-2" />
-              {copied ? 'Copied!' : 'Copy Link'}
+              <Share2 className="w-4 h-4 mr-2 shrink-0" />
+              <span className="truncate">{copied ? 'Copied!' : 'Copy Link'}</span>
             </Button>
           </div>
         </div>
