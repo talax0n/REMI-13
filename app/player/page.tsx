@@ -111,7 +111,7 @@ function LoginForm({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="min-h-screen bg-[#0B0F1A] p-4 flex items-start justify-center overflow-y-auto pt-8 pb-32"
+      className="h-dvh bg-[#0B0F1A] p-4 flex items-start justify-center overflow-y-auto overflow-x-hidden pt-8 pb-[max(8rem,env(safe-area-inset-bottom))]"
     >
       <div className="w-full max-w-md relative">
         {/* Header */}
@@ -162,7 +162,7 @@ function LoginForm({
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="absolute z-50 left-0 right-0 top-full mt-1 bg-zinc-800 border border-white/10 rounded-lg shadow-xl overflow-hidden"
+                      className="absolute z-50 left-0 right-0 top-full mt-1 bg-zinc-800 border border-white/10 rounded-lg shadow-xl overflow-y-auto max-h-[40vh]"
                     >
                       {filteredNames.map((suggestion, index) => (
                         <button
@@ -172,14 +172,14 @@ function LoginForm({
                           onMouseDown={(e) => e.preventDefault()}
                           className={`
                             w-full px-4 py-3 text-left text-white text-sm
-                            hover:bg-zinc-700/50 transition-colors flex items-center gap-3
+                            hover:bg-zinc-700/50 active:bg-zinc-700 transition-colors flex items-center gap-3
                             ${index !== filteredNames.length - 1 ? 'border-b border-white/5' : ''}
                           `}
                         >
-                          <div className="w-8 h-8 rounded-lg bg-zinc-700 flex items-center justify-center">
+                          <div className="w-8 h-8 shrink-0 rounded-lg bg-zinc-700 flex items-center justify-center">
                             <Users className="w-4 h-4 text-zinc-400" />
                           </div>
-                          <span className="font-medium">{suggestion}</span>
+                          <span className="font-medium truncate">{suggestion}</span>
                         </button>
                       ))}
                     </motion.div>
@@ -225,7 +225,7 @@ function LoginForm({
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="absolute z-50 left-0 right-0 top-full mt-1 bg-zinc-800 border border-white/10 rounded-lg shadow-xl overflow-hidden"
+                      className="absolute z-50 left-0 right-0 top-full mt-1 bg-zinc-800 border border-white/10 rounded-lg shadow-xl overflow-y-auto max-h-[40vh]"
                     >
                       {filteredTeams.map((suggestion, index) => {
                         const teamStyle = getTeamStyle(suggestion);
@@ -237,15 +237,15 @@ function LoginForm({
                             onMouseDown={(e) => e.preventDefault()}
                             className={`
                               w-full px-4 py-3 text-left text-white text-sm
-                              hover:bg-zinc-700/50 transition-colors flex items-center gap-3
+                              hover:bg-zinc-700/50 active:bg-zinc-700 transition-colors flex items-center gap-3
                               ${index !== filteredTeams.length - 1 ? 'border-b border-white/5' : ''}
                             `}
                           >
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${teamStyle.bg}`}>
+                            <div className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center ${teamStyle.bg}`}>
                               <Hash className={`w-4 h-4 ${teamStyle.text}`} />
                             </div>
-                            <div className="flex-1">
-                              <span className="font-medium">{suggestion}</span>
+                            <div className="flex-1 min-w-0">
+                              <span className="font-medium truncate block">{suggestion}</span>
                             </div>
                           </button>
                         );
@@ -258,7 +258,7 @@ function LoginForm({
                 {!team && !showTeamSuggestions && (
                   <div className="pt-2">
                     <p className="text-xs text-zinc-500 mb-2">Quick select:</p>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 min-[400px]:grid-cols-3 sm:grid-cols-4 gap-2">
                       {teams.slice(0, 8).map((teamName) => {
                         const teamStyle = getTeamStyle(teamName);
                         return (
@@ -267,9 +267,9 @@ function LoginForm({
                             type="button"
                             onClick={() => handleSelectTeam(teamName)}
                             className={`
-                              px-2 py-2 rounded-lg text-xs font-medium transition-all duration-200
+                              min-h-[44px] px-2 py-2 rounded-lg text-xs font-medium transition-all duration-200 truncate
                               ${teamStyle.bg} ${teamStyle.text} ${teamStyle.border} border
-                              hover:opacity-80
+                              hover:opacity-80 active:scale-[0.97]
                             `}
                           >
                             {teamName}
@@ -292,7 +292,7 @@ function LoginForm({
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-lg"
+                className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-semibold text-lg transition-transform"
               >
                 {loading ? (
                   <div className="flex items-center gap-2">
@@ -325,7 +325,7 @@ function NotFoundView({ onBack }: { onBack: () => void }) {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-[#0B0F1A] p-4 flex items-center justify-center"
+      className="h-dvh bg-[#0B0F1A] p-4 flex items-center justify-center overflow-y-auto"
     >
       <div className="w-full max-w-md text-center">
         <motion.div
@@ -367,7 +367,7 @@ function PlayerProfile({
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="h-screen bg-[#0B0F1A] overflow-y-auto overflow-x-hidden"
+      className="h-dvh bg-[#0B0F1A] overflow-y-auto overflow-x-hidden"
     >
       {/* Header */}
       <div className="sticky top-0 z-50 bg-[#0B0F1A]/90 backdrop-blur-sm border-b border-white/10">
@@ -389,7 +389,7 @@ function PlayerProfile({
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-4 pb-safe">
+      <div className="max-w-lg mx-auto px-4 py-4 space-y-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         {/* Player Header Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -400,11 +400,11 @@ function PlayerProfile({
           <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-yellow-500/10 to-transparent rounded-full blur-3xl" />
           
           <div className="relative">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h1 className="text-2xl font-bold text-white mb-1">{player.name}</h1>
-                <div className="flex items-center gap-2">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${teamStyle.bg} ${teamStyle.text}`}>
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl font-bold text-white mb-1 truncate">{player.name}</h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${teamStyle.bg} ${teamStyle.text} max-w-[60vw] truncate`}>
                     {player.team}
                   </span>
                   {player.status === 'winner' && (
@@ -416,7 +416,7 @@ function PlayerProfile({
                 </div>
               </div>
               {player.rank && (
-                <div className="flex flex-col items-center">
+                <div className="flex flex-col items-center shrink-0">
                   {getRankIcon(player.rank)}
                   <span className="text-xs text-zinc-500 mt-1">Rank</span>
                 </div>
@@ -478,44 +478,44 @@ function PlayerProfile({
                     }
                   `}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
                       {/* Phase Number */}
                       <div className={`
-                        w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold
-                        ${isCompleted 
-                          ? 'bg-emerald-500 text-white' 
+                        w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-xl flex items-center justify-center text-sm font-bold
+                        ${isCompleted
+                          ? 'bg-emerald-500 text-white'
                           : 'bg-zinc-800 text-zinc-500'
                         }
                       `}>
                         {phaseNum}
                       </div>
-                      
+
                       {/* Phase Info */}
-                      <div>
+                      <div className="min-w-0">
                         <p className="font-semibold text-white">Phase {phaseNum}</p>
                         {isCompleted && phaseData.tableNumber && (
                           <p className="text-xs text-zinc-400 flex items-center gap-1">
-                            <Hash className="w-3 h-3" />
-                            Table {phaseData.tableNumber}
+                            <Hash className="w-3 h-3 shrink-0" />
+                            <span className="truncate">Table {phaseData.tableNumber}</span>
                           </p>
                         )}
                       </div>
                     </div>
 
                     {/* Score or Pending */}
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       {isCompleted ? (
                         <>
-                          <p className={`text-lg font-bold ${phaseData.points < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                          <p className={`text-base sm:text-lg font-bold tabular-nums ${phaseData.points < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
                             {phaseData.points < 0 ? '' : '+'}{phaseData.points.toLocaleString()}
                           </p>
-                          <p className="text-xs text-zinc-500">
+                          <p className="text-[10px] sm:text-xs text-zinc-500">
                             {new Date(phaseData.timestamp).toLocaleDateString()}
                           </p>
                         </>
                       ) : (
-                        <div className="flex items-center gap-2 text-zinc-500">
+                        <div className="flex items-center gap-1.5 text-zinc-500">
                           <Clock className="w-4 h-4" />
                           <span className="text-sm">Pending</span>
                         </div>
@@ -540,25 +540,25 @@ function PlayerProfile({
           transition={{ delay: 0.3 }}
           className="bg-zinc-900/30 border border-white/10 rounded-lg p-4"
         >
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-white">{completedPhases}</p>
-              <p className="text-xs text-zinc-500 uppercase tracking-wider">Phases</p>
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
+            <div className="min-w-0">
+              <p className="text-xl sm:text-2xl font-bold text-white tabular-nums">{completedPhases}</p>
+              <p className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider">Phases</p>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-emerald-400">
+            <div className="min-w-0">
+              <p className="text-xl sm:text-2xl font-bold text-emerald-400 tabular-nums">
                 {player.rank ? `#${player.rank}` : '-'}
               </p>
-              <p className="text-xs text-zinc-500 uppercase tracking-wider">Rank</p>
+              <p className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider">Rank</p>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-white">
-                {phases.length > 0 
+            <div className="min-w-0">
+              <p className="text-xl sm:text-2xl font-bold text-white tabular-nums truncate">
+                {phases.length > 0
                   ? Math.round(phases.reduce((sum, [, data]) => sum + data.points, 0) / phases.length).toLocaleString()
                   : '0'
                 }
               </p>
-              <p className="text-xs text-zinc-500 uppercase tracking-wider">Avg/Phase</p>
+              <p className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider">Avg/Phase</p>
             </div>
           </div>
         </motion.div>
