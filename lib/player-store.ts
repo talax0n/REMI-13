@@ -51,7 +51,7 @@ export async function getPlayerScores(): Promise<PlayerScore[]> {
 export async function getLeaderboard(): Promise<PlayerScore[]> {
   const rows = await query<PlayerRow>(
     `SELECT * FROM players
-     WHERE status <> 'archived'
+     WHERE status NOT IN ('archived', 'inactive')
      ORDER BY total_score DESC, current_table ASC NULLS LAST, name ASC`
   );
   return rows.map(rowToPlayerScore);
@@ -65,7 +65,7 @@ export async function getPlayerByNameAndTeam(
     `SELECT * FROM players
      WHERE LOWER(name) = LOWER($1)
        AND LOWER(team) = LOWER($2)
-       AND status <> 'archived'`,
+       AND status NOT IN ('archived', 'inactive')`,
     [name, team]
   );
   return rows.length > 0 ? rowToPlayerScore(rows[0]) : null;

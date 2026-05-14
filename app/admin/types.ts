@@ -6,7 +6,7 @@ export interface AdminParticipant {
   matchesPlayed: number;
   tableNumber?: number;
   opponents?: string[];
-  status: 'active' | 'eliminated' | 'winner' | 'dummy' | 'archived';
+  status: 'active' | 'inactive' | 'eliminated' | 'winner' | 'dummy' | 'archived';
   eliminatedAtPhase?: number;
 }
 

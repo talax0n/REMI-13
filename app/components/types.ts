@@ -5,7 +5,7 @@ export interface Player {
   score: number;
   rank: number;
   previousRank?: number;
-  status?: 'active' | 'eliminated' | 'winner' | 'dummy' | 'archived';
+  status?: 'active' | 'inactive' | 'eliminated' | 'winner' | 'dummy' | 'archived';
   isDummy?: boolean;
   currentTable?: number;
   currentPhaseScore?: number;

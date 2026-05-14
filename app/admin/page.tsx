@@ -523,7 +523,7 @@ export default function AdminPage() {
   // Toggle participant active status (registration fee paid)
   const handleToggleActive = useCallback(async (id: string, active: boolean) => {
     const nextParticipants = participants.map((p) =>
-        p.id === id ? { ...p, status: active ? 'active' as const : 'eliminated' as const } : p
+        p.id === id ? { ...p, status: active ? 'active' as const : 'inactive' as const } : p
       );
     const activeCount = nextParticipants.filter((p) => p.status === 'active').length;
     setParticipants(nextParticipants);
