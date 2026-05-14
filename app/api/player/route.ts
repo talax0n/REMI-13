@@ -2,7 +2,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import {
-  getPlayerScores,
+  getLeaderboard,
   getPlayerByNameAndTeam,
   syncFromAdminParticipants,
   resetAllPlayerScores,
@@ -17,14 +17,14 @@ export async function GET(request: Request) {
   if (name && team) {
     const player = await getPlayerByNameAndTeam(name, team);
     if (player) {
-      const allPlayers = (await getPlayerScores()).sort((a, b) => b.totalScore - a.totalScore);
+      const allPlayers = (await getLeaderboard()).sort((a, b) => b.totalScore - a.totalScore);
       const rank = allPlayers.findIndex((p) => p.id === player.id) + 1;
       return Response.json({ ...player, rank });
     }
     return Response.json({ error: 'Player not found' }, { status: 404 });
   }
 
-  return Response.json(await getPlayerScores());
+  return Response.json(await getLeaderboard());
 }
 
 export async function POST(request: Request) {
