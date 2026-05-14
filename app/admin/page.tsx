@@ -204,8 +204,7 @@ export default function AdminPage() {
       const finalists = sorted.slice(0, finalCutoff);
 
       if (finalists.length < finalCutoff) {
-        toast.error(`Butuh minimal ${finalCutoff} pemain aktif untuk babak final`);
-        return;
+        throw new Error(`Butuh minimal ${finalCutoff} pemain aktif untuk babak final`);
       }
 
       const engineParticipants: EngineParticipant[] = finalists.map((p) => ({
@@ -251,7 +250,7 @@ export default function AdminPage() {
         finalTableA: undefined,
         finalTableB: undefined,
       }));
-      return;
+      return { warnings: shuffleResult.warnings };
     }
 
     // Phase 4 → Semifinal (top 10 or 20)
@@ -263,8 +262,7 @@ export default function AdminPage() {
       const semifinalists = sorted.slice(0, semifinalCutoff);
 
       if (semifinalists.length < semifinalCutoff) {
-        toast.error(`Butuh minimal ${semifinalCutoff} pemain aktif untuk babak semifinal`);
-        return;
+        throw new Error(`Butuh minimal ${semifinalCutoff} pemain aktif untuk babak semifinal`);
       }
 
       const engineParticipants: EngineParticipant[] = semifinalists.map((p) => ({
@@ -303,7 +301,7 @@ export default function AdminPage() {
       });
 
       setParticipants(updated);
-      return;
+      return { warnings: shuffleResult.warnings };
     }
 
     // Phases 1–3 → regular reshuffle. Unpaid/inactive players stay on the roster
@@ -333,14 +331,17 @@ export default function AdminPage() {
     }
 
     let tableGroups: EngineParticipant[][];
+    let warnings: string[] = [];
 
     try {
       const shuffleResult = engineGenerateTables(engineParticipants);
       tableGroups = shuffleResult.tables;
+      warnings = shuffleResult.warnings;
     } catch {
       const pool = [...engineParticipants].sort(() => Math.random() - 0.5);
       tableGroups = [];
       for (let i = 0; i < pool.length; i += 5) tableGroups.push(pool.slice(i, i + 5));
+      warnings = ['Mesin pairing utama gagal; sistem memakai fallback acak dan tetap menyimpan riwayat lawan.'];
     }
     updateOpponents(tableGroups);
 
@@ -364,6 +365,7 @@ export default function AdminPage() {
     });
 
     setParticipants(updated);
+    return { warnings };
   }, [finalCutoff, participants, semifinalCutoff, tournamentState.phase]);
 
   // Complete phase and advance

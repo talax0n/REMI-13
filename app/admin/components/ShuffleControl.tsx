@@ -23,7 +23,7 @@ interface ShuffleControlProps {
   finalCutoff: 5 | 10;
   onSemifinalCutoffChange: (cutoff: 10 | 20) => void;
   onFinalCutoffChange: (cutoff: 5 | 10) => void;
-  onShuffle: () => Promise<void>;
+  onShuffle: () => Promise<{ warnings: string[] }>;
   onPhaseComplete: () => void;
 }
 
@@ -65,7 +65,7 @@ export default function ShuffleControl({
     toast.loading('Generating tables...', { id: 'shuffle' });
     
     try {
-      await onShuffle();
+      const result = await onShuffle();
       const label =
         state.phase === 4 ? `Semifinal (Top ${semifinalCutoff})` :
         state.phase === 5 ? `Final (Top ${finalCutoff})` :
@@ -74,11 +74,14 @@ export default function ShuffleControl({
         id: 'shuffle',
         description: `Meja untuk ${label} sudah siap.`,
       });
+      result.warnings.forEach((warning) => {
+        toast.warning('Catatan pairing', { description: warning });
+      });
       onPhaseComplete();
     } catch (error) {
       toast.error('Gagal membuat meja', {
         id: 'shuffle',
-        description: 'Silakan coba lagi.',
+        description: error instanceof Error ? error.message : 'Silakan coba lagi.',
       });
     } finally {
       setIsShuffling(false);
