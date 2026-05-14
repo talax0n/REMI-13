@@ -480,17 +480,30 @@ export default function AdminPage() {
     toast.success('Database reset');
   }, []);
 
-  const handleDeleteParticipant = useCallback(async (id: string) => {
-    const response = await fetch(`/api/admin/player?id=${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-    });
+  const handleDeleteParticipants = useCallback(async (ids: string[]) => {
+    if (ids.length === 0) return;
 
-    if (!response.ok) {
-      toast.error('Failed to delete participant');
-      return;
+    const results = await Promise.all(
+      ids.map((id) =>
+        fetch(`/api/admin/player?id=${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+        })
+      )
+    );
+    const failedCount = results.filter((response) => !response.ok).length;
+
+    if (failedCount > 0) {
+      toast.error('Failed to delete some participants', {
+        description: `${failedCount} participant${failedCount === 1 ? '' : 's'} could not be deleted.`,
+      });
     }
 
-    const nextParticipants = participants.filter((p) => p.id !== id);
+    const deletedIds = new Set(
+      ids.filter((_, index) => results[index]?.ok)
+    );
+    if (deletedIds.size === 0) return;
+
+    const nextParticipants = participants.filter((p) => !deletedIds.has(p.id));
     const activeCount = nextParticipants.filter((p) => p.status === 'active').length;
     setParticipants(nextParticipants);
     setTournamentState((prev) => ({
@@ -498,28 +511,44 @@ export default function AdminPage() {
       totalParticipants: activeCount,
       totalTables: Math.ceil(activeCount / 5),
     }));
-    toast.success('Participant deleted');
+    toast.success(
+      deletedIds.size === 1 ? 'Participant deleted' : `${deletedIds.size} participants deleted`
+    );
+  }, [participants]);
+
+  const handleDeleteParticipant = useCallback(async (id: string) => {
+    await handleDeleteParticipants([id]);
+  }, [handleDeleteParticipants]);
+
+  const handleArchiveParticipants = useCallback(async (ids: string[], archived: boolean) => {
+    if (ids.length === 0) return;
+    const selectedIds = new Set(ids);
+    const nextParticipants = participants.map((p) =>
+      selectedIds.has(p.id)
+        ? {
+            ...p,
+            status: archived ? 'archived' as const : 'active' as const,
+            tableNumber: archived ? undefined : p.tableNumber,
+          }
+        : p
+    );
+    const activeCount = nextParticipants.filter((p) => p.status === 'active').length;
+    setParticipants(nextParticipants);
+    setTournamentState((prev) => ({
+      ...prev,
+      totalParticipants: activeCount,
+      totalTables: Math.ceil(activeCount / 5),
+    }));
+    toast.success(
+      archived
+        ? `${selectedIds.size} participant${selectedIds.size === 1 ? '' : 's'} archived`
+        : `${selectedIds.size} participant${selectedIds.size === 1 ? '' : 's'} restored`
+    );
   }, [participants]);
 
   const handleArchiveParticipant = useCallback(async (id: string, archived: boolean) => {
-    const nextParticipants = participants.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              status: archived ? 'archived' as const : 'active' as const,
-              tableNumber: archived ? undefined : p.tableNumber,
-            }
-          : p
-      );
-    const activeCount = nextParticipants.filter((p) => p.status === 'active').length;
-    setParticipants(nextParticipants);
-    setTournamentState((prev) => ({
-      ...prev,
-      totalParticipants: activeCount,
-      totalTables: Math.ceil(activeCount / 5),
-    }));
-    toast.success(archived ? 'Participant archived' : 'Participant restored');
-  }, [participants]);
+    await handleArchiveParticipants([id], archived);
+  }, [handleArchiveParticipants]);
 
   // Toggle participant active status (registration fee paid)
   const handleToggleActive = useCallback(async (id: string, active: boolean) => {
@@ -782,7 +811,9 @@ export default function AdminPage() {
                   participants={participants}
                   teams={teams}
                   onDelete={handleDeleteParticipant}
+                  onDeleteMany={handleDeleteParticipants}
                   onArchive={handleArchiveParticipant}
+                  onArchiveMany={handleArchiveParticipants}
                   onToggleActive={handleToggleActive}
                 />
               </div>

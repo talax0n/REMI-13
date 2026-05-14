@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Filter, Users, ChevronUp, ChevronDown, Trash2, Edit2, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Archive, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,7 +32,9 @@ interface ParticipantTableProps {
   teams: string[];
   isLoading?: boolean;
   onDelete?: (id: string) => Promise<void>;
+  onDeleteMany?: (ids: string[]) => Promise<void>;
   onArchive?: (id: string, archived: boolean) => Promise<void>;
+  onArchiveMany?: (ids: string[], archived: boolean) => Promise<void>;
   onEdit?: (participant: AdminParticipant) => void;
   onToggleActive?: (id: string, active: boolean) => Promise<void>;
 }
@@ -74,7 +76,9 @@ export default function ParticipantTable({
   teams,
   isLoading = false,
   onDelete,
+  onDeleteMany,
   onArchive,
+  onArchiveMany,
   onEdit,
   onToggleActive,
 }: ParticipantTableProps) {
@@ -85,6 +89,8 @@ export default function ParticipantTable({
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkActionLoading, setIsBulkActionLoading] = useState(false);
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -161,6 +167,55 @@ export default function ParticipantTable({
     const end = start + pageSize;
     return filteredParticipants.slice(start, end);
   }, [filteredParticipants, safeCurrentPage, pageSize]);
+  const selectedParticipants = useMemo(
+    () => participants.filter((participant) => selectedIds.has(participant.id)),
+    [participants, selectedIds]
+  );
+  const visibleSelectableIds = useMemo(
+    () => paginatedParticipants.map((participant) => participant.id),
+    [paginatedParticipants]
+  );
+  const allVisibleSelected = visibleSelectableIds.length > 0
+    && visibleSelectableIds.every((id) => selectedIds.has(id));
+  const someVisibleSelected = visibleSelectableIds.some((id) => selectedIds.has(id));
+
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const existingIds = new Set(participants.map((participant) => participant.id));
+      const next = new Set(Array.from(prev).filter((id) => existingIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [participants]);
+
+  const toggleSelected = (id: string, selected: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (selected) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleVisibleSelected = (selected: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      visibleSelectableIds.forEach((id) => {
+        if (selected) next.add(id);
+        else next.delete(id);
+      });
+      return next;
+    });
+  };
+
+  const runBulkAction = async (action: () => Promise<void>) => {
+    setIsBulkActionLoading(true);
+    try {
+      await action();
+      setSelectedIds(new Set());
+    } finally {
+      setIsBulkActionLoading(false);
+    }
+  };
 
   const renderSortIcon = (field: SortField) => {
     if (sortField !== field) return null;
@@ -270,11 +325,87 @@ export default function ParticipantTable({
             </div>
           </div>
 
+          {selectedParticipants.length > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-3">
+              <div>
+                <p className="text-sm font-medium text-cyan-100">
+                  {selectedParticipants.length} selected
+                </p>
+                <p className="text-xs text-cyan-300/70">
+                  Bulk actions apply to selected participants across all pages.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {onArchiveMany && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isBulkActionLoading}
+                      onClick={() => runBulkAction(() => onArchiveMany(Array.from(selectedIds), true))}
+                      className="border-white/20 text-white hover:bg-white/10"
+                    >
+                      <Archive className="w-4 h-4 mr-2" />
+                      Archive
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isBulkActionLoading}
+                      onClick={() => runBulkAction(() => onArchiveMany(Array.from(selectedIds), false))}
+                      className="border-white/20 text-white hover:bg-white/10"
+                    >
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Restore
+                    </Button>
+                  </>
+                )}
+                {onDeleteMany && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isBulkActionLoading}
+                    onClick={() => runBulkAction(() => onDeleteMany(Array.from(selectedIds)))}
+                    className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={isBulkActionLoading}
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-zinc-400 hover:text-white"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Table */}
           <div className="border border-white/10 rounded-lg overflow-hidden">
             <Table>
               <TableHeader className="bg-zinc-800">
                 <TableRow className="border-white/10 hover:bg-transparent">
+                  <TableHead className="w-10 text-center">
+                    <input
+                      type="checkbox"
+                      aria-label="Select visible participants"
+                      checked={allVisibleSelected}
+                      ref={(input) => {
+                        if (input) input.indeterminate = !allVisibleSelected && someVisibleSelected;
+                      }}
+                      onChange={(e) => toggleVisibleSelected(e.target.checked)}
+                      className="h-4 w-4 rounded border-white/20 bg-zinc-900 accent-cyan-500"
+                    />
+                  </TableHead>
                   <TableHead
                     className="text-zinc-300 cursor-pointer hover:text-white"
                     onClick={() => handleSort('name')}
@@ -327,6 +458,7 @@ export default function ParticipantTable({
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i} className="border-white/5">
+                      <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-16" /></TableCell>
@@ -337,7 +469,7 @@ export default function ParticipantTable({
                   ))
                 ) : paginatedParticipants.length === 0 ? (
                   <TableRow className="border-white/5">
-                    <TableCell colSpan={6} className="text-center py-8 text-zinc-500">
+                    <TableCell colSpan={7} className="text-center py-8 text-zinc-500">
                       No participants found
                     </TableCell>
                   </TableRow>
@@ -351,6 +483,15 @@ export default function ParticipantTable({
                         key={participant.id}
                         className={`border-white/5 hover:bg-white/[0.02] ${isArchived ? 'opacity-50' : ''}`}
                       >
+                        <TableCell className="text-center">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${participant.name}`}
+                            checked={selectedIds.has(participant.id)}
+                            onChange={(e) => toggleSelected(participant.id, e.target.checked)}
+                            className="h-4 w-4 rounded border-white/20 bg-zinc-900 accent-cyan-500"
+                          />
+                        </TableCell>
                         <TableCell className="font-medium text-white">
                           {participant.name}
                         </TableCell>
