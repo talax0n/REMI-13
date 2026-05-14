@@ -7,7 +7,7 @@ export interface PhaseScore {
 export interface PlayerScore {
   id: string;
   name: string;
-  church: string;
+  team: string;
   scores: Record<number, PhaseScore>; // phase number -> score
   totalScore: number;
   status: 'active' | 'eliminated' | 'winner';
@@ -20,5 +20,5 @@ export type PlayerView = 'login' | 'loading' | 'profile' | 'not-found';
 
 export interface LoginFormData {
   name: string;
-  church: string;
+  team: string;
 }

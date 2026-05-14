@@ -7,9 +7,22 @@ interface TableRow {
   players: Table['players'];
 }
 
+type StoredPlayer = Table['players'][number] & { church?: string; team?: string };
+
+function normalizeStoredPlayers(players: StoredPlayer[]): Table['players'] {
+  return players.map(({ church, ...player }) => ({
+    ...player,
+    team: player.team ?? church ?? '',
+  }));
+}
+
 export async function getTables(): Promise<Table[]> {
   const rows = await query<TableRow>('SELECT * FROM game_tables ORDER BY number ASC');
-  return rows.map((r) => ({ id: r.id, number: r.number, players: r.players }));
+  return rows.map((r) => ({
+    id: r.id,
+    number: r.number,
+    players: normalizeStoredPlayers(r.players as StoredPlayer[]),
+  }));
 }
 
 export async function setTables(tables: Table[]): Promise<void> {

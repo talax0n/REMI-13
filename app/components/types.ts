@@ -1,7 +1,7 @@
 export interface Player {
   id: string;
   name: string;
-  church: string;
+  team: string;
   score: number;
   rank: number;
   previousRank?: number;

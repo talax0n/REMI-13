@@ -1,7 +1,7 @@
 export interface AdminParticipant {
   id: string;
   name: string;
-  church: string;
+  team: string;
   score: number;
   matchesPlayed: number;
   tableNumber?: number;

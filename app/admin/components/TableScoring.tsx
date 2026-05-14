@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { churchColors, defaultChurchColor } from '../../components/participants';
+import { teamColors, defaultTeamColor } from '../../components/participants';
 import { Table, Player } from '../../components/types';
 import { PlayerScore } from '../../player/types';
 
@@ -17,8 +17,8 @@ interface TableScoringProps {
   onSaveScores: (updates: { id: string; score: number; phase: number }[]) => Promise<void>;
 }
 
-function getChurchStyle(church: string) {
-  return churchColors[church] || defaultChurchColor;
+function getTeamStyle(team: string) {
+  return teamColors[team] || defaultTeamColor;
 }
 
 export default function TableScoring({ currentPhase = 1, onSaveScores }: TableScoringProps) {
@@ -295,7 +295,7 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
           {currentTable?.players.map((player: Player, index: number) => {
             const dbScore = playerScores.get(player.id) ?? player.score;
             const hasNewScore = scores[player.id] !== undefined;
-            const churchStyle = getChurchStyle(player.church);
+            const teamStyle = getTeamStyle(player.team);
 
             return (
               <motion.div
@@ -322,8 +322,8 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-bold text-white truncate">{player.name}</h3>
                     </div>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${churchStyle.bg} ${churchStyle.text}`}>
-                      {player.church}
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${teamStyle.bg} ${teamStyle.text}`}>
+                      {player.team}
                     </span>
                     <div className="mt-2 flex items-center gap-2">
                       <span className="text-xs text-zinc-500">Current:</span>

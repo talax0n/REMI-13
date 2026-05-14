@@ -18,19 +18,19 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 
 interface ParticipantFormProps {
-  churches: string[];
-  onAddParticipant: (name: string, church: string) => Promise<void>;
+  teams: string[];
+  onAddParticipant: (name: string, team: string) => Promise<void>;
 }
 
-export default function ParticipantForm({ churches, onAddParticipant }: ParticipantFormProps) {
+export default function ParticipantForm({ teams, onAddParticipant }: ParticipantFormProps) {
   const [name, setName] = useState('');
-  const [church, setChurch] = useState('');
+  const [team, setTeam] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
-    if (!name.trim() || !church) {
+    if (!name.trim() || !team) {
       toast.error('Please fill in all fields');
       return;
     }
@@ -38,12 +38,12 @@ export default function ParticipantForm({ churches, onAddParticipant }: Particip
     setIsLoading(true);
     
     try {
-      await onAddParticipant(name.trim(), church);
+      await onAddParticipant(name.trim(), team);
       toast.success('Participant added', {
-        description: `${name} from ${church} has been added.`,
+        description: `${name} from ${team} has been added.`,
       });
       setName('');
-      setChurch('');
+      setTeam('');
     } catch (error) {
       toast.error('Failed to add participant');
     } finally {
@@ -78,13 +78,13 @@ export default function ParticipantForm({ churches, onAddParticipant }: Particip
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="church" className="text-zinc-300">Church</Label>
-              <Select value={church} onValueChange={setChurch}>
+              <Label htmlFor="team" className="text-zinc-300">Team</Label>
+              <Select value={team} onValueChange={setTeam}>
                 <SelectTrigger className="bg-zinc-800/50 border-white/10 text-white">
-                  <SelectValue placeholder="Select church" />
+                  <SelectValue placeholder="Select team" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-800 border-white/10">
-                  {churches.map((c) => (
+                  {teams.map((c) => (
                     <SelectItem 
                       key={c} 
                       value={c}
@@ -101,7 +101,7 @@ export default function ParticipantForm({ churches, onAddParticipant }: Particip
 
             <Button
               type="submit"
-              disabled={isLoading || !name.trim() || !church}
+              disabled={isLoading || !name.trim() || !team}
               className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50"
             >
               <Plus className="w-4 h-4 mr-2" />

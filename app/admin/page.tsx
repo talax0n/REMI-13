@@ -47,7 +47,7 @@ function buildTablesFromParticipants(parts: AdminParticipant[]): Table[] {
         .map((p, i): Player => ({
           id: p.id,
           name: p.name,
-          church: p.church,
+          team: p.team,
           score: p.score,
           rank: i + 1,
           status: p.status,
@@ -55,9 +55,9 @@ function buildTablesFromParticipants(parts: AdminParticipant[]): Table[] {
     }));
 }
 
-// Extract unique churches
-function extractChurches(participants: AdminParticipant[]): string[] {
-  return Array.from(new Set(participants.map((p) => p.church))).sort();
+// Extract unique teams
+function extractTeams(participants: AdminParticipant[]): string[] {
+  return Array.from(new Set(participants.map((p) => p.team))).sort();
 }
 
 type TabType = 'participants' | 'scoring';
@@ -85,7 +85,7 @@ export default function AdminPage() {
   // the DB already has correct state; syncing would unnecessarily overwrite tables.
   const syncEnabled = useRef(false);
 
-  const churches = useMemo(() => extractChurches(participants), [participants]);
+  const teams = useMemo(() => extractTeams(participants), [participants]);
 
   // Load state from DB on mount
   useEffect(() => {
@@ -116,11 +116,11 @@ export default function AdminPage() {
 
   // Add single participant
   const handleAddParticipant = useCallback(
-    async (name: string, church: string) => {
+    async (name: string, team: string) => {
       const newParticipant: AdminParticipant = {
         id: `participant-${Date.now()}`,
         name,
-        church,
+        team,
         score: 0,
         matchesPlayed: 0,
         status: 'active',
@@ -164,7 +164,7 @@ export default function AdminPage() {
       const engineParticipants: EngineParticipant[] = topTen.map((p) => ({
         id: p.id,
         name: p.name,
-        church: p.church,
+        team: p.team,
         score: p.score,
         opponents: new Set(p.opponents ?? []),
       }));
@@ -209,7 +209,7 @@ export default function AdminPage() {
       const engineParticipants: EngineParticipant[] = topTwenty.map((p) => ({
         id: p.id,
         name: p.name,
-        church: p.church,
+        team: p.team,
         score: p.score,
         opponents: new Set(p.opponents ?? []),
       }));
@@ -258,7 +258,7 @@ export default function AdminPage() {
     const engineParticipants: EngineParticipant[] = assignable.map((p) => ({
       id: p.id,
       name: p.name,
-      church: p.church,
+      team: p.team,
       score: p.score,
       opponents: new Set(p.opponents ?? []),
     }));
@@ -268,12 +268,12 @@ export default function AdminPage() {
     try {
       const shuffleResult = engineGenerateTables(engineParticipants);
       tableGroups = shuffleResult.tables;
-      updateOpponents(tableGroups);
     } catch {
       const pool = [...engineParticipants].sort(() => Math.random() - 0.5);
       tableGroups = [];
       for (let i = 0; i < pool.length; i += 5) tableGroups.push(pool.slice(i, i + 5));
     }
+    updateOpponents(tableGroups);
 
     const tableNumberMap = new Map<string, number>();
     const opponentsMap = new Map<string, string[]>();
@@ -622,7 +622,7 @@ export default function AdminPage() {
                   onPhaseComplete={handlePhaseComplete}
                 />
                 <ParticipantForm
-                  churches={churches}
+                  teams={teams}
                   onAddParticipant={handleAddParticipant}
                 />
                 <BulkImportUploader
@@ -635,7 +635,7 @@ export default function AdminPage() {
               <div className="lg:col-span-8">
                 <ParticipantTable
                   participants={participants}
-                  churches={churches}
+                  teams={teams}
                   onDelete={handleDeleteParticipant}
                   onToggleActive={handleToggleActive}
                 />

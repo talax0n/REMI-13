@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { QrCode, Download, X, Share2, Copy, Check } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { QrCode, Download, Share2, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -13,28 +12,13 @@ interface PlayerQRCodeProps {
 }
 
 export default function PlayerQRCode({ isOpen, onClose }: PlayerQRCodeProps) {
-  const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const playerUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}/player`
     : '/player';
-
-  useEffect(() => {
-    if (isOpen) {
-      generateQRCode();
-    }
-  }, [isOpen]);
-
-  const generateQRCode = async () => {
-    try {
-      // We'll generate a simple QR code using an API service
-      // In production, you might want to use a library like qrcode
-      const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(playerUrl)}`;
-      setQrDataUrl(qrApiUrl);
-    } catch (error) {
-      console.error('Failed to generate QR code:', error);
-    }
-  };
+  const qrDataUrl = isOpen
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(playerUrl)}`
+    : '';
 
   const handleDownload = async () => {
     if (!qrDataUrl) return;

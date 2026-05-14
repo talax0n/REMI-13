@@ -32,7 +32,7 @@ async function runMigration(): Promise<void> {
       CREATE TABLE IF NOT EXISTS players (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        church TEXT NOT NULL,
+        team TEXT NOT NULL,
         total_score INTEGER NOT NULL DEFAULT 0,
         status TEXT NOT NULL DEFAULT 'active',
         current_table INTEGER,
@@ -61,6 +61,30 @@ async function runMigration(): Promise<void> {
       INSERT INTO tournament_state (id, phase, status, max_phases)
       VALUES (1, 1, 'completed', 6)
       ON CONFLICT (id) DO NOTHING;
+    `);
+
+    await client.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'players' AND column_name = 'church'
+        ) AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'players' AND column_name = 'team'
+        ) THEN
+          ALTER TABLE players RENAME COLUMN church TO team;
+        ELSIF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'players' AND column_name = 'church'
+        ) AND EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'players' AND column_name = 'team'
+        ) THEN
+          UPDATE players SET team = church WHERE team IS NULL OR team = '';
+          ALTER TABLE players ALTER COLUMN church DROP NOT NULL;
+        END IF;
+      END $$;
     `);
   } finally {
     client.release();

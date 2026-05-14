@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "verify:shuffle-history": "node --no-warnings scripts/verify-shuffle-history.mjs"
   },
   "dependencies": {
     "@types/pg": "^8.20.0",

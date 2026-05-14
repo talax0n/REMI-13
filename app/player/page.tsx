@@ -1,13 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
   AlertCircle, 
-  ChevronRight, 
   TrendingUp,
-  Award,
   Clock,
   Hash,
   Users,
@@ -20,12 +18,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { PlayerScore, PlayerView, LoginFormData } from './types';
-import { churchColors, defaultChurchColor } from '../components/participants';
+import { teamColors, defaultTeamColor } from '../components/participants';
 
 const MAX_PHASES = 6;
 
-function getChurchStyle(church: string) {
-  return churchColors[church] || defaultChurchColor;
+function getTeamStyle(team: string) {
+  return teamColors[team] || defaultTeamColor;
 }
 
 function getRankIcon(rank: number) {
@@ -40,54 +38,40 @@ function getRankIcon(rank: number) {
 function LoginForm({ 
   onSubmit, 
   loading, 
-  churches,
+  teams,
   availableParticipants
 }: { 
   onSubmit: (data: LoginFormData) => void; 
   loading: boolean;
-  churches: string[];
+  teams: string[];
   availableParticipants: string[];
 }) {
   const [name, setName] = useState('');
-  const [church, setChurch] = useState('');
-  const [errors, setErrors] = useState({ name: false, church: false });
+  const [team, setTeam] = useState('');
+  const [errors, setErrors] = useState({ name: false, team: false });
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [filteredNames, setFilteredNames] = useState<string[]>([]);
-  const [showChurchSuggestions, setShowChurchSuggestions] = useState(false);
-  const [filteredChurches, setFilteredChurches] = useState<string[]>([]);
+  const [showTeamSuggestions, setShowTeamSuggestions] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Filter names based on input
-  useEffect(() => {
-    if (name.trim()) {
-      const filtered = availableParticipants.filter(p => 
+  const filteredNames = useMemo(() => {
+    if (!name.trim()) return [];
+    return availableParticipants.filter(p =>
         p.toLowerCase().includes(name.toLowerCase()) && 
         p.toLowerCase() !== name.toLowerCase()
       ).slice(0, 5);
-      setFilteredNames(filtered);
-      setShowSuggestions(filtered.length > 0);
-    } else {
-      setShowSuggestions(false);
-    }
   }, [name, availableParticipants]);
 
-  // Filter churches based on input
-  useEffect(() => {
-    if (church.trim()) {
-      const filtered = churches.filter(c => 
-        c.toLowerCase().includes(church.toLowerCase()) && 
-        c.toLowerCase() !== church.toLowerCase()
+  const filteredTeams = useMemo(() => {
+    if (!team.trim()) return [];
+    return teams.filter(c =>
+        c.toLowerCase().includes(team.toLowerCase()) && 
+        c.toLowerCase() !== team.toLowerCase()
       ).slice(0, 5);
-      setFilteredChurches(filtered);
-      setShowChurchSuggestions(filtered.length > 0);
-    } else {
-      setShowChurchSuggestions(false);
-      setFilteredChurches([]);
-    }
-  }, [church, churches]);
+  }, [team, teams]);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value);
+    setShowSuggestions(!!e.target.value.trim());
     setErrors(prev => ({ ...prev, name: false }));
   };
 
@@ -96,29 +80,30 @@ function LoginForm({
     setShowSuggestions(false);
   };
 
-  const handleChurchChange = (value: string) => {
-    setChurch(value);
-    setErrors(prev => ({ ...prev, church: false }));
+  const handleTeamChange = (value: string) => {
+    setTeam(value);
+    setShowTeamSuggestions(!!value.trim());
+    setErrors(prev => ({ ...prev, team: false }));
   };
 
-  const handleSelectChurch = (selectedChurch: string) => {
-    setChurch(selectedChurch);
-    setShowChurchSuggestions(false);
-    setErrors(prev => ({ ...prev, church: false }));
+  const handleSelectTeam = (selectedTeam: string) => {
+    setTeam(selectedTeam);
+    setShowTeamSuggestions(false);
+    setErrors(prev => ({ ...prev, team: false }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setShowSuggestions(false);
-    setShowChurchSuggestions(false);
+    setShowTeamSuggestions(false);
     const newErrors = {
       name: !name.trim(),
-      church: !church.trim(),
+      team: !team.trim(),
     };
     setErrors(newErrors);
     
-    if (!newErrors.name && !newErrors.church) {
-      onSubmit({ name, church });
+    if (!newErrors.name && !newErrors.team) {
+      onSubmit({ name, team });
     }
   };
 
@@ -209,55 +194,55 @@ function LoginForm({
                 )}
               </div>
 
-              {/* Church Selection with Search */}
+              {/* Team Selection with Search */}
               <div className="space-y-2 relative">
                 <label className="text-sm font-medium text-zinc-300 flex items-center gap-2">
                   <Hash className="w-4 h-4 text-zinc-500" />
-                  Your Church
+                  Your Team
                 </label>
                 
-                {/* Church Input */}
+                {/* Team Input */}
                 <div className="relative">
                   <Input
                     type="text"
-                    value={church}
-                    onChange={(e) => handleChurchChange(e.target.value)}
-                    onFocus={() => church.trim() && filteredChurches.length > 0 && setShowChurchSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowChurchSuggestions(false), 200)}
-                    placeholder="Type or select your church..."
+                    value={team}
+                    onChange={(e) => handleTeamChange(e.target.value)}
+                    onFocus={() => team.trim() && filteredTeams.length > 0 && setShowTeamSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowTeamSuggestions(false), 200)}
+                    placeholder="Type or select your team..."
                     autoComplete="off"
                     className={`bg-zinc-800/50 border-white/10 text-white h-12 text-lg pr-10 ${
-                      errors.church ? 'border-red-500/50 focus:border-red-500' : ''
+                      errors.team ? 'border-red-500/50 focus:border-red-500' : ''
                     }`}
                   />
                   <Hash className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 pointer-events-none" />
                 </div>
                 
-                {/* Church Search Suggestions */}
+                {/* Team Search Suggestions */}
                 <AnimatePresence>
-                  {showChurchSuggestions && filteredChurches.length > 0 && (
+                  {showTeamSuggestions && filteredTeams.length > 0 && (
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
                       className="absolute z-50 left-0 right-0 top-full mt-1 bg-zinc-800 border border-white/10 rounded-lg shadow-xl overflow-hidden"
                     >
-                      {filteredChurches.map((suggestion, index) => {
-                        const churchStyle = getChurchStyle(suggestion);
+                      {filteredTeams.map((suggestion, index) => {
+                        const teamStyle = getTeamStyle(suggestion);
                         return (
                           <button
                             key={suggestion}
                             type="button"
-                            onClick={() => handleSelectChurch(suggestion)}
+                            onClick={() => handleSelectTeam(suggestion)}
                             onMouseDown={(e) => e.preventDefault()}
                             className={`
                               w-full px-4 py-3 text-left text-white text-sm
                               hover:bg-zinc-700/50 transition-colors flex items-center gap-3
-                              ${index !== filteredChurches.length - 1 ? 'border-b border-white/5' : ''}
+                              ${index !== filteredTeams.length - 1 ? 'border-b border-white/5' : ''}
                             `}
                           >
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${churchStyle.bg}`}>
-                              <Hash className={`w-4 h-4 ${churchStyle.text}`} />
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${teamStyle.bg}`}>
+                              <Hash className={`w-4 h-4 ${teamStyle.text}`} />
                             </div>
                             <div className="flex-1">
                               <span className="font-medium">{suggestion}</span>
@@ -270,24 +255,24 @@ function LoginForm({
                 </AnimatePresence>
 
                 {/* Quick Select Grid (shows when input is empty) */}
-                {!church && !showChurchSuggestions && (
+                {!team && !showTeamSuggestions && (
                   <div className="pt-2">
                     <p className="text-xs text-zinc-500 mb-2">Quick select:</p>
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                      {churches.slice(0, 8).map((churchName) => {
-                        const churchStyle = getChurchStyle(churchName);
+                      {teams.slice(0, 8).map((teamName) => {
+                        const teamStyle = getTeamStyle(teamName);
                         return (
                           <button
-                            key={churchName}
+                            key={teamName}
                             type="button"
-                            onClick={() => handleSelectChurch(churchName)}
+                            onClick={() => handleSelectTeam(teamName)}
                             className={`
                               px-2 py-2 rounded-lg text-xs font-medium transition-all duration-200
-                              ${churchStyle.bg} ${churchStyle.text} ${churchStyle.border} border
+                              ${teamStyle.bg} ${teamStyle.text} ${teamStyle.border} border
                               hover:opacity-80
                             `}
                           >
-                            {churchName}
+                            {teamName}
                           </button>
                         );
                       })}
@@ -295,10 +280,10 @@ function LoginForm({
                   </div>
                 )}
                 
-                {errors.church && (
+                {errors.team && (
                   <p className="text-red-400 text-sm flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" />
-                    Please select your church
+                    Please select your team
                   </p>
                 )}
               </div>
@@ -352,7 +337,7 @@ function NotFoundView({ onBack }: { onBack: () => void }) {
         </motion.div>
         <h2 className="text-2xl font-bold text-white mb-2">Player Not Found</h2>
         <p className="text-zinc-400 mb-6">
-          We couldn't find a player with that name and church combination. Please check your details and try again.
+          We couldn&apos;t find a player with that name and team combination. Please check your details and try again.
         </p>
         <Button
           onClick={onBack}
@@ -374,7 +359,7 @@ function PlayerProfile({
   player: PlayerScore; 
   onBack: () => void;
 }) {
-  const churchStyle = getChurchStyle(player.church);
+  const teamStyle = getTeamStyle(player.team);
   const phases = Object.entries(player.scores).sort(([a], [b]) => parseInt(a) - parseInt(b));
   const completedPhases = phases.length;
   
@@ -397,8 +382,8 @@ function PlayerProfile({
               <ArrowRight className="w-4 h-4 mr-1 rotate-180" />
               Back
             </Button>
-            <Badge className={`${churchStyle.bg} ${churchStyle.text} ${churchStyle.border} border`}>
-              {player.church}
+            <Badge className={`${teamStyle.bg} ${teamStyle.text} ${teamStyle.border} border`}>
+              {player.team}
             </Badge>
           </div>
         </div>
@@ -419,8 +404,8 @@ function PlayerProfile({
               <div>
                 <h1 className="text-2xl font-bold text-white mb-1">{player.name}</h1>
                 <div className="flex items-center gap-2">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${churchStyle.bg} ${churchStyle.text}`}>
-                    {player.church}
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${teamStyle.bg} ${teamStyle.text}`}>
+                    {player.team}
                   </span>
                   {player.status === 'winner' && (
                     <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
@@ -595,7 +580,7 @@ export default function PlayerPage() {
   const [allPlayers, setAllPlayers] = useState<PlayerScore[]>([]);
 
   // Subscribe to the same live stream the leaderboard uses.
-  // - Populates the name/church search from real player data.
+  // - Populates the name/team search from real player data.
   // - Keeps the profile view in sync when admin records scores.
   useEffect(() => {
     const es = new EventSource('/api/player/stream');
@@ -620,13 +605,13 @@ export default function PlayerPage() {
 
   // Derived from live stream — same source as the leaderboard
   const availableParticipants = allPlayers.map((p) => p.name).sort();
-  const churches = Array.from(new Set(allPlayers.map((p) => p.church))).sort();
+  const teams = Array.from(new Set(allPlayers.map((p) => p.team))).sort();
 
   const handleLogin = useCallback(async (data: LoginFormData) => {
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/player?name=${encodeURIComponent(data.name)}&church=${encodeURIComponent(data.church)}`
+        `/api/player?name=${encodeURIComponent(data.name)}&team=${encodeURIComponent(data.team)}`
       );
       if (response.ok) {
         const playerData: PlayerScore = await response.json();
@@ -656,7 +641,7 @@ export default function PlayerPage() {
           key="login"
           onSubmit={handleLogin}
           loading={loading}
-          churches={churches}
+          teams={teams}
           availableParticipants={availableParticipants}
         />
       )}

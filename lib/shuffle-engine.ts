@@ -3,28 +3,28 @@
 // =============================================================================
 //
 // BUG IN v3 (roundRobinSeed with interleave + i%numTables):
-//   Interleaving produces an ordered[] array where each church appears at
-//   positions separated by the current round size. When smaller churches
+//   Interleaving produces an ordered[] array where each team appears at
+//   positions separated by the current round size. When smaller teams
 //   exhaust, round size shrinks. DS members shift to irregular offsets.
 //   i % numTables then puts two DS members at the same table.
 //
-//   Example: DS=24, 21 tables, 10 churches.
-//   DS[0]→i=0→T0, DS[20]→i=200→T11, DS[21]→i=209→T20... BUT if churches
+//   Example: DS=24, 21 tables, 10 teams.
+//   DS[0]→i=0→T0, DS[20]→i=200→T11, DS[21]→i=209→T20... BUT if teams
 //   exhaust mid-way and round sizes fluctuate, DS[21] might land at T0
 //   again, giving T0 two DS (and some tables three DS in worst case).
 //
-// V4 FIX — per-church sequential assignment:
+// V4 FIX — per-team sequential assignment:
 //
-//   Instead of interleaving first then assigning, assign each church's
+//   Instead of interleaving first then assigning, assign each team's
 //   members to tables INDEPENDENTLY:
 //
-//     church_member[k]  →  table[ (k + offset) % numTables ]
+//     team_member[k]  →  table[ (k + offset) % numTables ]
 //
-//   where offset is a random starting table for that church (randomises
+//   where offset is a random starting table for that team (randomises
 //   which tables carry the overflow without breaking the ceiling guarantee).
 //
 //   PROOF of correctness:
-//     For church C with size S across T tables:
+//     For team C with size S across T tables:
 //       table j receives members at positions k where (k+offset)%T = j,
 //       i.e. k = j-offset, j-offset+T, j-offset+2T, ...
 //       Count = ceil(S/T) if (j-offset+T)%T < S%T, else floor(S/T).
@@ -32,9 +32,9 @@
 //     No interleave step, no round-size fluctuation, no edge cases.
 //
 // Architecture:
-//   Phase 1 — Per-church sequential assignment  (O(N), provably optimal)
+//   Phase 1 — Per-team sequential assignment  (O(N), provably optimal)
 //   Phase 2 — Hill-climbing swaps               (O(maxIter x tableSize))
-//             Optimises opponent-history while holding church cap as invariant.
+//             Optimises opponent-history while holding team cap as invariant.
 //   Multiple independent runs; best repeat-violation count returned.
 //
 // =============================================================================
@@ -42,7 +42,7 @@
 export interface Participant {
   id: string;
   name: string;
-  church: string;
+  team: string;
   score: number;
   /** IDs of all participants this player has shared a table with in prior phases. */
   opponents: Set<string>;
@@ -60,16 +60,16 @@ export interface GenerateTablesOptions {
 export interface ShuffleResult {
   tables: Participant[][];
   /**
-   * Same-church pairs that were impossible to separate.
+   * Same-team pairs that were impossible to separate.
    * e.g. DS has 24 members, 21 tables -> ceil(24/21)=2 -> 3 tables must share DS pairs.
    * These are NOT bugs — they are the mathematical minimum.
    */
-  unavoidableChurchPairs: number;
+  unavoidableTeamPairs: number;
   /**
-   * Same-church pairs that COULD have been separated but were not.
+   * Same-team pairs that COULD have been separated but were not.
    * After v4 this should always be 0.
    */
-  avoidableChurchViolations: number;
+  avoidableTeamViolations: number;
   /** Pairs who have shared a table in a prior phase, seated together again. */
   repeatViolations: number;
   iterationsUsed: number;
@@ -108,12 +108,12 @@ export function fisherYatesShuffle<T>(arr: T[], rng: () => number = Math.random)
 // Violation counters
 // ---------------------------------------------------------------------------
 
-/** Number of same-church pairs within a single table. */
-function churchPairs(table: Participant[]): number {
+/** Number of same-team pairs within a single table. */
+function teamPairs(table: Participant[]): number {
   let n = 0;
   for (let i = 0; i < table.length; i++)
     for (let j = i + 1; j < table.length; j++)
-      if (table[i].church === table[j].church) n++;
+      if (table[i].team === table[j].team) n++;
   return n;
 }
 
@@ -127,7 +127,7 @@ function repeatPairs(table: Participant[]): number {
 }
 
 // ---------------------------------------------------------------------------
-// Phase 1 — Per-church sequential assignment + size rebalancing
+// Phase 1 — Per-team sequential assignment + size rebalancing
 // ---------------------------------------------------------------------------
 
 /**
@@ -146,9 +146,9 @@ function computeTargetSizes(N: number): number[] {
  *
  * When choosing which participant to move from an over-full table, we score
  * each candidate:
- *   +2 if their church appears ≥2 times at the source (redundant — good to move)
- *   +1 if their church does NOT appear at the destination (won't create a new pair)
- * This keeps church distribution as close to optimal as possible after rebalancing.
+ *   +2 if their team appears ≥2 times at the source (redundant — good to move)
+ *   +1 if their team does NOT appear at the destination (won't create a new pair)
+ * This keeps team distribution as close to optimal as possible after rebalancing.
  */
 function rebalanceSizes(tables: Participant[][], targetSizes: number[]): void {
   for (let round = 0; round < tables.length * TABLE_SIZE; round++) {
@@ -159,17 +159,17 @@ function rebalanceSizes(tables: Participant[][], targetSizes: number[]): void {
 
     const src = tables[srcIdx];
     const dst = tables[dstIdx];
-    const dstChurches = new Set(dst.map((p) => p.church));
+    const dstTeams = new Set(dst.map((p) => p.team));
 
     const srcCounts = new Map<string, number>();
-    for (const p of src) srcCounts.set(p.church, (srcCounts.get(p.church) ?? 0) + 1);
+    for (const p of src) srcCounts.set(p.team, (srcCounts.get(p.team) ?? 0) + 1);
 
     let bestScore = -Infinity;
     let bestIdx = 0;
     for (let k = 0; k < src.length; k++) {
-      const c = src[k].church;
+      const c = src[k].team;
       const score =
-        ((srcCounts.get(c) ?? 0) >= 2 ? 2 : 0) + (dstChurches.has(c) ? 0 : 1);
+        ((srcCounts.get(c) ?? 0) >= 2 ? 2 : 0) + (dstTeams.has(c) ? 0 : 1);
       if (score > bestScore) { bestScore = score; bestIdx = k; }
     }
 
@@ -181,16 +181,16 @@ function rebalanceSizes(tables: Participant[][], targetSizes: number[]): void {
 /**
  * Phase 1: Assigns participants to tables guaranteeing:
  *   1. Each table has EXACTLY the target size (TABLE_SIZE, or remainder for the last).
- *   2. Same-church concentration is at most ceil(churchSize / numTables) per table.
+ *   2. Same-team concentration is at most ceil(teamSize / numTables) per table.
  *
  * Algorithm:
- *   a) Per-church round-robin with random offset — minimises church concentration.
+ *   a) Per-team round-robin with random offset — minimises team concentration.
  *   b) Size rebalancing — moves participants between over/under-full tables to hit
- *      exact target sizes, preferring moves that preserve church separation.
+ *      exact target sizes, preferring moves that preserve team separation.
  *   c) Partial table (if any) is sorted to the last position so hill-climbing
  *      can safely exclude it by index.
  */
-function perChurchSeed(
+function perTeamSeed(
   participants: Participant[],
   numTables: number,
   rng: () => number,
@@ -198,16 +198,16 @@ function perChurchSeed(
   const N = participants.length;
   const targetSizes = computeTargetSizes(N);
 
-  // Group by church
-  const byChurch = new Map<string, Participant[]>();
+  // Group by team
+  const byTeam = new Map<string, Participant[]>();
   for (const p of participants) {
-    if (!byChurch.has(p.church)) byChurch.set(p.church, []);
-    byChurch.get(p.church)!.push(p);
+    if (!byTeam.has(p.team)) byTeam.set(p.team, []);
+    byTeam.get(p.team)!.push(p);
   }
 
   const tables: Participant[][] = Array.from({ length: numTables }, () => []);
 
-  for (const members of byChurch.values()) {
+  for (const members of byTeam.values()) {
     const shuffled = fisherYatesShuffle(members, rng);
     const offset = Math.floor(rng() * numTables);
     shuffled.forEach((p, k) => {
@@ -215,7 +215,7 @@ function perChurchSeed(
     });
   }
 
-  // Guarantee exact table sizes — fix any imbalance from independent per-church assignment
+  // Guarantee exact table sizes — fix any imbalance from independent per-team assignment
   rebalanceSizes(tables, targetSizes);
 
   // Sort so partial table (if any) is last, keeping it out of hill-climbing slice
@@ -232,18 +232,18 @@ function perChurchSeed(
 // ---------------------------------------------------------------------------
 
 /**
- * Reduces church-pair violations AND repeat-opponent meetings via randomised
+ * Reduces team-pair violations AND repeat-opponent meetings via randomised
  * hill-climbing.
  *
- * Accept rule (priority order, church is NEVER allowed to get worse):
- *   1. Church strictly improves (and repeats don't worsen)  → accept
- *   2. Church stays same AND repeats strictly improve        → accept
+ * Accept rule (priority order, team is NEVER allowed to get worse):
+ *   1. Team strictly improves (and repeats don't worsen)  → accept
+ *   2. Team stays same AND repeats strictly improve        → accept
  *   3. Anything else                                         → revert
  *
  * This fixes a key Phase-1 gap: when there are no prior opponents
  * (totalRepeats = 0) the old code exited immediately, leaving avoidable
- * church-pair concentrations (e.g. table with 2 Agape + 2 DS) unfixed.
- * Now hill-climbing also eliminates avoidable church violations even in
+ * team-pair concentrations (e.g. table with 2 Agape + 2 DS) unfixed.
+ * Now hill-climbing also eliminates avoidable team violations even in
  * Phase 1, where repeat history plays no role yet.
  *
  * Pre-computes per-table counts so each iteration is O(tableSize²).
@@ -256,12 +256,12 @@ function hillClimb(
 ): number {
   const numTables = tables.length;
 
-  const chCount = tables.map(churchPairs);
+  const teamCount = tables.map(teamPairs);
   const repCount = tables.map(repeatPairs);
   let totalRepeats = repCount.reduce((s, v) => s + v, 0);
-  let totalChurch = chCount.reduce((s, v) => s + v, 0);
+  let totalTeam = teamCount.reduce((s, v) => s + v, 0);
 
-  for (let iter = 0; iter < maxIter && (totalChurch > 0 || totalRepeats > 0); iter++) {
+  for (let iter = 0; iter < maxIter && (totalTeam > 0 || totalRepeats > 0); iter++) {
     const ti = Math.floor(rng() * numTables);
     let tj = Math.floor(rng() * numTables);
     while (tj === ti) tj = Math.floor(rng() * numTables);
@@ -269,7 +269,7 @@ function hillClimb(
     const pi = Math.floor(rng() * tables[ti].length);
     const pj = Math.floor(rng() * tables[tj].length);
 
-    const oldCh = chCount[ti] + chCount[tj];
+    const oldTeam = teamCount[ti] + teamCount[tj];
     const oldRep = repCount[ti] + repCount[tj];
 
     // Perform swap
@@ -277,25 +277,25 @@ function hillClimb(
     tables[ti][pi] = tables[tj][pj];
     tables[tj][pj] = tmp;
 
-    const newChI = churchPairs(tables[ti]);
-    const newChJ = churchPairs(tables[tj]);
+    const newTeamI = teamPairs(tables[ti]);
+    const newTeamJ = teamPairs(tables[tj]);
     const newRepI = repeatPairs(tables[ti]);
     const newRepJ = repeatPairs(tables[tj]);
 
-    const newCh = newChI + newChJ;
+    const newTeam = newTeamI + newTeamJ;
     const newRep = newRepI + newRepJ;
 
-    // Accept: church never worsens, AND at least one metric strictly improves
-    const churchOk = newCh <= oldCh;
-    const somethingImproved = newCh < oldCh || newRep < oldRep;
+    // Accept: team never worsens, AND at least one metric strictly improves
+    const teamOk = newTeam <= oldTeam;
+    const somethingImproved = newTeam < oldTeam || newRep < oldRep;
 
-    if (churchOk && somethingImproved) {
-      chCount[ti] = newChI;
-      chCount[tj] = newChJ;
+    if (teamOk && somethingImproved) {
+      teamCount[ti] = newTeamI;
+      teamCount[tj] = newTeamJ;
       repCount[ti] = newRepI;
       repCount[tj] = newRepJ;
       totalRepeats += newRep - oldRep;
-      totalChurch += newCh - oldCh;
+      totalTeam += newTeam - oldTeam;
     } else {
       // Revert
       tables[tj][pj] = tables[ti][pi];
@@ -307,44 +307,44 @@ function hillClimb(
 }
 
 // ---------------------------------------------------------------------------
-// Church overflow analysis
+// Team overflow analysis
 // ---------------------------------------------------------------------------
 
 interface OverflowDetail {
-  church: string;
+  team: string;
   size: number;
   maxPerTable: number;
   forcedPairs: number;
 }
 
 /**
- * Computes the minimum unavoidable same-church pairs given church sizes
+ * Computes the minimum unavoidable same-team pairs given team sizes
  * and table count.
  *
- * For a church with S members across T tables:
+ * For a team with S members across T tables:
  *   perTable   = ceil(S / T)
  *   if perTable >= 2: forced pairs per overflow table = C(perTable, 2)
  *   overflow tables = S % T   (tables that carry the extra member)
  */
-function analyseChurchOverflow(
+function analyseTeamOverflow(
   participants: Participant[],
   numTables: number,
 ): { total: number; details: OverflowDetail[] } {
   const counts = new Map<string, number>();
   for (const p of participants)
-    counts.set(p.church, (counts.get(p.church) ?? 0) + 1);
+    counts.set(p.team, (counts.get(p.team) ?? 0) + 1);
 
   let total = 0;
   const details: OverflowDetail[] = [];
 
-  for (const [church, size] of counts) {
+  for (const [team, size] of counts) {
     const perTable = Math.ceil(size / numTables);
     if (perTable < 2) continue;
     const pairs = (perTable * (perTable - 1)) / 2;
     const overflowTables = size % numTables === 0 ? numTables : size % numTables;
     const forcedPairs = pairs * overflowTables;
     total += forcedPairs;
-    details.push({ church, size, maxPerTable: perTable, forcedPairs });
+    details.push({ team, size, maxPerTable: perTable, forcedPairs });
   }
 
   return { total, details };
@@ -358,7 +358,7 @@ function analyseChurchOverflow(
  * Assigns all participants into tables of TABLE_SIZE (5).
  *
  * Any remainder (N % 5 != 0) forms a final partial table. Partial tables
- * receive Phase 1 church-optimal seeding but are excluded from Phase 2
+ * receive Phase 1 team-optimal seeding but are excluded from Phase 2
  * hill-climbing (too few members to swap meaningfully).
  *
  * @param participants  Full participant list. opponents Set must be pre-loaded
@@ -379,58 +379,58 @@ export function generateTables(
   const hasRemainder = N % TABLE_SIZE !== 0;
   const totalTables = numFull + (hasRemainder ? 1 : 0);
 
-  const overflow = analyseChurchOverflow(participants, Math.max(numFull, 1));
+  const overflow = analyseTeamOverflow(participants, Math.max(numFull, 1));
 
   let bestTables: Participant[][] | null = null;
   let bestRepeats = Infinity;
-  let bestChurch = Infinity;
+  let bestTeam = Infinity;
   let totalIters = 0;
 
   for (let run = 0; run < runs; run++) {
-    // Phase 1: church-optimal seeding (provably minimum concentration)
-    const allTables = perChurchSeed(participants, totalTables, rng);
+    // Phase 1: team-optimal seeding (provably minimum concentration)
+    const allTables = perTeamSeed(participants, totalTables, rng);
 
     // Partial table (if any) sits outside the full-table optimisation
     const fullTables = hasRemainder ? allTables.slice(0, numFull) : allTables;
     const partial = hasRemainder ? allTables.slice(numFull) : [];
 
-    // Phase 2: reduce repeat-opponent meetings without worsening church spread
+    // Phase 2: reduce repeat-opponent meetings without worsening team spread
     hillClimb(fullTables, maxIter, rng);
     totalIters += maxIter;
 
     const combined = [...fullTables, ...partial];
-    const church = combined.reduce((s, t) => s + churchPairs(t), 0);
+    const team = combined.reduce((s, t) => s + teamPairs(t), 0);
     const repeats = combined.reduce((s, t) => s + repeatPairs(t), 0);
 
     const isBetter =
-      church < bestChurch || (church === bestChurch && repeats < bestRepeats);
+      team < bestTeam || (team === bestTeam && repeats < bestRepeats);
 
     if (isBetter) {
       bestTables = combined.map((t) => [...t]);
-      bestChurch = church;
+      bestTeam = team;
       bestRepeats = repeats;
     }
   }
 
   const tables = bestTables!;
-  const avoidable = bestChurch - overflow.total;
+  const avoidable = bestTeam - overflow.total;
   const warnings: string[] = [];
 
   if (overflow.details.length > 0) {
     const parts = overflow.details.map(
-      ({ church, size, maxPerTable }) =>
-        `${church} (${size} anggota, maks ${maxPerTable}/meja)`,
+      ({ team, size, maxPerTable }) =>
+        `${team} (${size} anggota, maks ${maxPerTable}/meja)`,
     );
     warnings.push(
-      `Gereja terlalu besar untuk dipisah sempurna: ${parts.join('; ')}. ` +
-        `${overflow.total} pasangan gereja sama tidak bisa dihindari secara matematika.`,
+      `Team terlalu besar untuk dipisah sempurna: ${parts.join('; ')}. ` +
+        `${overflow.total} pasangan team sama tidak bisa dihindari secara matematika.`,
     );
   }
 
   if (avoidable > 0) {
     // Should never happen in v4 — surface as a bug report
     warnings.push(
-      `BUG: ${avoidable} pelanggaran gereja yang seharusnya bisa dihindari masih tersisa. ` +
+      `BUG: ${avoidable} pelanggaran team yang seharusnya bisa dihindari masih tersisa. ` +
         `Harap laporkan ke developer.`,
     );
   }
@@ -438,14 +438,14 @@ export function generateTables(
   if (bestRepeats > 0) {
     warnings.push(
       `${bestRepeats} pasangan pernah bertemu di fase sebelumnya. ` +
-        `Ini wajar mulai fase 4-5 dengan banyak peserta dan gereja besar.`,
+        `Ini wajar mulai fase 4-5 dengan banyak peserta dan team besar.`,
     );
   }
 
   return {
     tables,
-    unavoidableChurchPairs: overflow.total,
-    avoidableChurchViolations: avoidable,
+    unavoidableTeamPairs: overflow.total,
+    avoidableTeamViolations: avoidable,
     repeatViolations: bestRepeats,
     iterationsUsed: totalIters,
     runtimeMs: performance.now() - t0,

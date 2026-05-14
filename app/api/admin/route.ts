@@ -1,12 +1,16 @@
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 import { query, ensureMigrated } from '@/lib/db';
 import { participants as seedParticipants } from '@/app/components/participants';
 import { replaceAllAdminParticipants, syncFromAdminParticipants } from '@/lib/player-store';
+import { recordTableOpponentHistory } from '@/lib/opponent-history';
 import { AdminParticipant } from '@/app/admin/types';
 
 interface PlayerRow {
   id: string;
   name: string;
-  church: string;
+  team: string;
   total_score: number;
   status: string;
   current_table: number | null;
@@ -21,16 +25,17 @@ interface TournamentStateRow {
 }
 
 function buildSeedAdminParticipants(): AdminParticipant[] {
-  return seedParticipants.map((p, index) => ({
+  const participants = seedParticipants.map((p, index) => ({
     id: `participant-${index}`,
     name: p.name,
-    church: p.church,
+    team: p.team,
     score: 0,
     matchesPlayed: 0,
     status: p.active ? ('active' as const) : ('eliminated' as const),
     tableNumber: p.tableNumber,
     opponents: [],
   }));
+  return recordTableOpponentHistory(participants);
 }
 
 export async function GET() {
@@ -54,7 +59,7 @@ export async function GET() {
       participants.map((p) => ({
         id: p.id,
         name: p.name,
-        church: p.church,
+        team: p.team,
         score: p.score,
         status: p.status,
         tableNumber: p.tableNumber,
@@ -71,7 +76,7 @@ export async function GET() {
     participants = playerRows.map((row) => ({
       id: row.id,
       name: row.name,
-      church: row.church,
+      team: row.team,
       score: row.total_score,
       matchesPlayed: row.matches_played,
       status: row.status as AdminParticipant['status'],
@@ -104,11 +109,11 @@ export async function POST(request: Request) {
       participants.map((p) => ({
         id: p.id,
         name: p.name,
-        church: p.church,
+        team: p.team,
         score: 0,
         status: p.status,
         tableNumber: p.tableNumber,
-        opponents: [],
+        opponents: p.opponents,
         matchesPlayed: 0,
       }))
     );

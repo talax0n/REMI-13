@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, FileSpreadsheet, X, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +19,7 @@ interface BulkImportUploaderProps {
 
 interface CSVRow {
   name: string;
-  church: string;
+  team: string;
 }
 
 export default function BulkImportUploader({ existingParticipants, onImport }: BulkImportUploaderProps) {
@@ -37,19 +37,21 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
     const lines = content.trim().split('\n');
     const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
     const nameIndex = headers.indexOf('name');
-    const churchIndex = headers.indexOf('church');
+    const teamIndex = headers.indexOf('team');
+    const legacyChurchIndex = headers.indexOf('church');
+    const groupingIndex = teamIndex !== -1 ? teamIndex : legacyChurchIndex;
 
-    if (nameIndex === -1 || churchIndex === -1) {
-      throw new Error('CSV must have "name" and "church" columns');
+    if (nameIndex === -1 || groupingIndex === -1) {
+      throw new Error('CSV must have "name" and "team" columns');
     }
 
-    return lines.slice(1).map((line, index) => {
+    return lines.slice(1).map((line) => {
       const values = line.split(',').map(v => v.trim());
       return {
         name: values[nameIndex] || '',
-        church: values[churchIndex] || '',
+        team: values[groupingIndex] || '',
       };
-    }).filter(row => row.name || row.church);
+    }).filter(row => row.name || row.team);
   };
 
   const validateData = (data: CSVRow[]): ImportValidation => {
@@ -64,8 +66,8 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
       if (!row.name) {
         missingFields.push(`Row ${rowNum}: Missing name`);
       }
-      if (!row.church) {
-        missingFields.push(`Row ${rowNum}: Missing church`);
+      if (!row.team) {
+        missingFields.push(`Row ${rowNum}: Missing team`);
       }
       
       if (row.name && existingNames.has(row.name.toLowerCase())) {
@@ -81,18 +83,7 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
     };
   };
 
-  const handleFileDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file) processFile(file);
-  }, []);
-
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
-  }, []);
-
-  const processFile = async (file: File) => {
+  async function processFile(file: File) {
     if (!file.name.endsWith('.csv')) {
       toast.error('Invalid file type', { description: 'Please upload a CSV file' });
       return;
@@ -121,6 +112,17 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
       });
       setStatus('error');
     }
+  }
+
+  const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
   };
 
   const handleImport = async () => {
@@ -129,7 +131,7 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
     try {
       const participants = previewData.map(row => ({
         name: row.name,
-        church: row.church,
+        team: row.team,
         score: 0,
         matchesPlayed: 0,
         status: 'active' as const,
@@ -196,7 +198,7 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
                       Drop CSV file here or click to upload
                     </p>
                     <p className="text-sm text-zinc-500">
-                      Required columns: name, church
+                      Required columns: name, team
                     </p>
                   </label>
                 </div>
@@ -254,14 +256,14 @@ export default function BulkImportUploader({ existingParticipants, onImport }: B
                     <TableHeader className="bg-zinc-800">
                       <TableRow className="border-white/10">
                         <TableHead className="text-zinc-300">Name</TableHead>
-                        <TableHead className="text-zinc-300">Church</TableHead>
+                        <TableHead className="text-zinc-300">Team</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {previewData.map((row, index) => (
                         <TableRow key={index} className="border-white/5">
                           <TableCell className="text-white">{row.name}</TableCell>
-                          <TableCell className="text-zinc-400">{row.church}</TableCell>
+                          <TableCell className="text-zinc-400">{row.team}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

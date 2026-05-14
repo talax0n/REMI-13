@@ -13,7 +13,7 @@ function convertToPlayers(scores: PlayerScore[]): Player[] {
   return scores.map((p, index) => ({
     id: p.id,
     name: p.name,
-    church: p.church,
+    team: p.team,
     score: p.totalScore,
     rank: index + 1,
     status: p.status,
@@ -38,7 +38,7 @@ function buildPhase1Tables(players: Player[]): Table[] {
       tableMap.get(tableNum)!.push({
         id: `p1-${index}`,
         name: p.name,
-        church: p.church,
+        team: p.team,
         score: scoreByName.get(p.name.toUpperCase()) ?? 0,
         rank: 0,
       });

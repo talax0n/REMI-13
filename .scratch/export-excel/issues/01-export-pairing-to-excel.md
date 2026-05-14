@@ -1,0 +1,29 @@
+---
+Status: needs-triage
+Category: enhancement
+Source: user feedback 2026-05-14
+---
+
+# Export pairing result to Excel for print
+
+## Original feedback
+
+> hasil pairing kalo bisa di export ke excel utk print lembaran buat pengisian nilai di masing2 table
+
+## Summary
+
+Admin can export current round's pairing assignments to Excel (`.xlsx`) — one sheet per table or one sheet listing all — formatted for print as score entry sheets at each physical table.
+
+## Codebase pointers
+
+- `app/admin/page.tsx` — add export button
+- New helper, e.g. `lib/export-excel.ts` (likely needs `xlsx` or `exceljs` dep)
+- `lib/tables-store.ts` — read current pairing
+
+## Open questions
+
+- One workbook per round, one sheet per table? Or single sheet with all tables?
+- Columns: player name, team, score blanks?
+- Include round number + date in header?
+
+## Comments

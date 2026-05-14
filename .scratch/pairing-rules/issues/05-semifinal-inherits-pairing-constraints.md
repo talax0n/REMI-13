@@ -1,0 +1,26 @@
+---
+Status: needs-triage
+Category: enhancement
+Source: user feedback 2026-05-14
+---
+
+# Semi-final pairing inherits same constraints as penyisihan
+
+## Original feedback
+
+> Babak Semi Final juga harus pairing dng kategori sama pada pairing sebelum nya
+
+## Summary
+
+Semi-final pairing reuses penyisihan rules: tables of 5 (with dummies if needed), same-team-different-table constraint, reshuffle from prior round.
+
+## Codebase pointers
+
+- `lib/shuffle-engine.ts` — phase-aware entry point
+- Depends on `pairing-rules/01`, `pairing-rules/04`
+
+## Open questions
+
+- Final phase: same constraint set? (See `phase-config/03`.)
+
+## Comments

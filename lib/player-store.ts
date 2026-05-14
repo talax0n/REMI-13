@@ -4,7 +4,7 @@ import { query } from './db';
 interface PlayerRow {
   id: string;
   name: string;
-  church: string;
+  team: string;
   total_score: number;
   status: string;
   current_table: number | null;
@@ -13,11 +13,27 @@ interface PlayerRow {
   matches_played: number;
 }
 
+type AdminParticipantInput = {
+  id: string;
+  name: string;
+  team?: string;
+  church?: string;
+  score: number;
+  status: string;
+  tableNumber?: number;
+  opponents?: string[];
+  matchesPlayed?: number;
+};
+
+function getInputTeam(participant: AdminParticipantInput): string {
+  return participant.team ?? participant.church ?? '';
+}
+
 function rowToPlayerScore(row: PlayerRow): PlayerScore {
   return {
     id: row.id,
     name: row.name,
-    church: row.church,
+    team: row.team,
     totalScore: row.total_score,
     status: row.status as PlayerScore['status'],
     currentTable: row.current_table ?? undefined,
@@ -35,13 +51,13 @@ export async function getLeaderboard(): Promise<PlayerScore[]> {
   return rows.map(rowToPlayerScore);
 }
 
-export async function getPlayerByNameAndChurch(
+export async function getPlayerByNameAndTeam(
   name: string,
-  church: string
+  team: string
 ): Promise<PlayerScore | null> {
   const rows = await query<PlayerRow>(
-    'SELECT * FROM players WHERE LOWER(name) = LOWER($1) AND LOWER(church) = LOWER($2)',
-    [name, church]
+    'SELECT * FROM players WHERE LOWER(name) = LOWER($1) AND LOWER(team) = LOWER($2)',
+    [name, team]
   );
   return rows.length > 0 ? rowToPlayerScore(rows[0]) : null;
 }
@@ -77,32 +93,14 @@ export async function resetAllPlayerScores(): Promise<void> {
 }
 
 export async function replaceAllAdminParticipants(
-  adminParticipants: Array<{
-    id: string;
-    name: string;
-    church: string;
-    score: number;
-    status: string;
-    tableNumber?: number;
-    opponents?: string[];
-    matchesPlayed?: number;
-  }>
+  adminParticipants: AdminParticipantInput[]
 ): Promise<void> {
   await query('DELETE FROM players');
   await syncFromAdminParticipants(adminParticipants);
 }
 
 export async function syncFromAdminParticipants(
-  adminParticipants: Array<{
-    id: string;
-    name: string;
-    church: string;
-    score: number;
-    status: string;
-    tableNumber?: number;
-    opponents?: string[];
-    matchesPlayed?: number;
-  }>
+  adminParticipants: AdminParticipantInput[]
 ): Promise<void> {
   if (adminParticipants.length === 0) return;
 
@@ -116,7 +114,7 @@ export async function syncFromAdminParticipants(
   const params = adminParticipants.flatMap((ap) => [
     ap.id,
     ap.name,
-    ap.church,
+    getInputTeam(ap),
     ap.score,
     ap.status,
     ap.tableNumber ?? null,
@@ -125,11 +123,11 @@ export async function syncFromAdminParticipants(
   ]);
 
   await query(
-    `INSERT INTO players (id, name, church, total_score, status, current_table, opponents, matches_played)
+    `INSERT INTO players (id, name, team, total_score, status, current_table, opponents, matches_played)
      VALUES ${placeholders}
      ON CONFLICT (id) DO UPDATE SET
        name = EXCLUDED.name,
-       church = EXCLUDED.church,
+       team = EXCLUDED.team,
        total_score = EXCLUDED.total_score,
        status = EXCLUDED.status,
        current_table = EXCLUDED.current_table,

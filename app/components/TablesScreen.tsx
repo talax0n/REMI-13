@@ -3,14 +3,14 @@
 import { motion } from 'framer-motion';
 import { Users } from 'lucide-react';
 import { Table } from './types';
-import { churchColors, defaultChurchColor } from './participants';
+import { teamColors, defaultTeamColor } from './participants';
 
 interface TablesScreenProps {
   tables: Table[];
 }
 
-function getChurchStyle(church: string) {
-  return churchColors[church] || defaultChurchColor;
+function getTeamStyle(team: string) {
+  return teamColors[team] || defaultTeamColor;
 }
 
 export default function TablesScreen({ tables }: TablesScreenProps) {
@@ -55,7 +55,7 @@ export default function TablesScreen({ tables }: TablesScreenProps) {
               {/* Players List - Compact */}
               <div className="p-1">
                 {table.players.map((player, playerIndex) => {
-                  const churchStyle = getChurchStyle(player.church);
+                  const teamStyle = getTeamStyle(player.team);
 
                   return (
                     <motion.div
@@ -71,8 +71,8 @@ export default function TablesScreen({ tables }: TablesScreenProps) {
                         <span className="text-xs text-white truncate">{player.name}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className={`text-[9px] px-1 rounded ${churchStyle.bg} ${churchStyle.text}`}>
-                          {player.church}
+                        <span className={`text-[9px] px-1 rounded ${teamStyle.bg} ${teamStyle.text}`}>
+                          {player.team}
                         </span>
                         <span className="text-xs font-semibold text-white tabular-nums w-10 text-right">
                           {player.score.toLocaleString()}

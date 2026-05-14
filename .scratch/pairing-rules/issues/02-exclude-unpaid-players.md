@@ -1,0 +1,28 @@
+---
+Status: needs-triage
+Category: enhancement
+Source: user feedback 2026-05-14
+---
+
+# Unpaid players excluded from pairing
+
+## Original feedback
+
+> Kalau ada yang belum bayar maka pada saat pairing tidak di ikut sertakan
+
+## Summary
+
+Pairing pulls only players with `paid = true`. Unpaid players remain on the roster but skipped until they pay.
+
+## Codebase pointers
+
+- `lib/player-store.ts` — add/confirm `paid: boolean` field
+- `lib/shuffle-engine.ts` — filter at input
+- `app/admin/components/ParticipantTable.tsx` — toggle paid status
+
+## Open questions
+
+- Toggle paid → re-trigger pairing automatically or manual re-run?
+- Show warning count of excluded unpaid players before running pairing?
+
+## Comments

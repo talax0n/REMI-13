@@ -25,22 +25,22 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { AdminParticipant } from '../types';
-import { churchColors, defaultChurchColor } from '../../components/participants';
+import { teamColors, defaultTeamColor } from '../../components/participants';
 
 interface ParticipantTableProps {
   participants: AdminParticipant[];
-  churches: string[];
+  teams: string[];
   isLoading?: boolean;
   onDelete?: (id: string) => Promise<void>;
   onEdit?: (participant: AdminParticipant) => void;
   onToggleActive?: (id: string, active: boolean) => Promise<void>;
 }
 
-type SortField = 'name' | 'church' | 'score' | 'matchesPlayed' | 'status';
+type SortField = 'name' | 'team' | 'score' | 'matchesPlayed' | 'status';
 type SortDirection = 'asc' | 'desc';
 
-function getChurchStyle(church: string) {
-  return churchColors[church] || defaultChurchColor;
+function getTeamStyle(team: string) {
+  return teamColors[team] || defaultTeamColor;
 }
 
 // Stats Card Component
@@ -70,14 +70,14 @@ function StatsCard({
 
 export default function ParticipantTable({
   participants,
-  churches,
+  teams,
   isLoading = false,
   onDelete,
   onEdit,
   onToggleActive,
 }: ParticipantTableProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [churchFilter, setChurchFilter] = useState<string>('all');
+  const [teamFilter, setTeamFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('score');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -110,9 +110,9 @@ export default function ParticipantTable({
       );
     }
 
-    // Filter by church
-    if (churchFilter && churchFilter !== 'all') {
-      result = result.filter((p) => p.church === churchFilter);
+    // Filter by team
+    if (teamFilter && teamFilter !== 'all') {
+      result = result.filter((p) => p.team === teamFilter);
     }
 
     // Filter by status
@@ -129,8 +129,8 @@ export default function ParticipantTable({
         case 'name':
           comparison = a.name.localeCompare(b.name);
           break;
-        case 'church':
-          comparison = a.church.localeCompare(b.church);
+        case 'team':
+          comparison = a.team.localeCompare(b.team);
           break;
         case 'score':
           comparison = a.score - b.score;
@@ -146,22 +146,18 @@ export default function ParticipantTable({
     });
 
     return result;
-  }, [participants, searchQuery, churchFilter, statusFilter, sortField, sortDirection]);
+  }, [participants, searchQuery, teamFilter, statusFilter, sortField, sortDirection]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredParticipants.length / pageSize);
+  const safeCurrentPage = Math.min(currentPage, Math.max(totalPages, 1));
   const paginatedParticipants = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    const start = (safeCurrentPage - 1) * pageSize;
     const end = start + pageSize;
     return filteredParticipants.slice(start, end);
-  }, [filteredParticipants, currentPage, pageSize]);
+  }, [filteredParticipants, safeCurrentPage, pageSize]);
 
-  // Reset to first page when filters change
-  useMemo(() => {
-    setCurrentPage(1);
-  }, [searchQuery, churchFilter, statusFilter, pageSize]);
-
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const renderSortIcon = (field: SortField) => {
     if (sortField !== field) return null;
     return sortDirection === 'asc' ? (
       <ChevronUp className="w-4 h-4 ml-1" />
@@ -222,15 +218,15 @@ export default function ParticipantTable({
             </div>
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-zinc-500" />
-              <Select value={churchFilter} onValueChange={setChurchFilter}>
+              <Select value={teamFilter} onValueChange={setTeamFilter}>
                 <SelectTrigger className="w-[140px] bg-zinc-800/50 border-white/10 text-white">
-                  <SelectValue placeholder="Church" />
+                  <SelectValue placeholder="Team" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-800 border-white/10">
                   <SelectItem value="all" className="text-white hover:bg-zinc-700">
-                    All Churches
+                    All Teams
                   </SelectItem>
-                  {churches.map((c) => (
+                  {teams.map((c) => (
                     <SelectItem
                       key={c}
                       value={c}
@@ -271,16 +267,16 @@ export default function ParticipantTable({
                   >
                     <div className="flex items-center">
                       Name
-                      <SortIcon field="name" />
+                      {renderSortIcon('name')}
                     </div>
                   </TableHead>
                   <TableHead
                     className="text-zinc-300 cursor-pointer hover:text-white"
-                    onClick={() => handleSort('church')}
+                    onClick={() => handleSort('team')}
                   >
                     <div className="flex items-center">
-                      Church
-                      <SortIcon field="church" />
+                      Team
+                      {renderSortIcon('team')}
                     </div>
                   </TableHead>
                   <TableHead
@@ -289,7 +285,7 @@ export default function ParticipantTable({
                   >
                     <div className="flex items-center justify-end">
                       Score
-                      <SortIcon field="score" />
+                      {renderSortIcon('score')}
                     </div>
                   </TableHead>
                   <TableHead
@@ -298,7 +294,7 @@ export default function ParticipantTable({
                   >
                     <div className="flex items-center justify-end">
                       Matches
-                      <SortIcon field="matchesPlayed" />
+                      {renderSortIcon('matchesPlayed')}
                     </div>
                   </TableHead>
                   <TableHead
@@ -307,7 +303,7 @@ export default function ParticipantTable({
                   >
                     <div className="flex items-center justify-center">
                       Paid
-                      <SortIcon field="status" />
+                      {renderSortIcon('status')}
                     </div>
                   </TableHead>
                   <TableHead className="text-zinc-300 text-right">Actions</TableHead>
@@ -333,7 +329,7 @@ export default function ParticipantTable({
                   </TableRow>
                 ) : (
                   paginatedParticipants.map((participant) => {
-                    const churchStyle = getChurchStyle(participant.church);
+                    const teamStyle = getTeamStyle(participant.team);
                     const isActive = participant.status === 'active';
                     return (
                       <TableRow
@@ -345,9 +341,9 @@ export default function ParticipantTable({
                         </TableCell>
                         <TableCell>
                           <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${churchStyle.bg} ${churchStyle.text}`}
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${teamStyle.bg} ${teamStyle.text}`}
                           >
-                            {participant.church}
+                            {participant.team}
                           </span>
                         </TableCell>
                         <TableCell className="text-right font-mono text-white">
@@ -404,7 +400,10 @@ export default function ParticipantTable({
             {/* Page size selector */}
             <div className="flex items-center gap-2">
               <span className="text-sm text-zinc-500">Show</span>
-              <Select value={pageSize.toString()} onValueChange={(v) => setPageSize(parseInt(v))}>
+              <Select value={pageSize.toString()} onValueChange={(v) => {
+                setPageSize(parseInt(v));
+                setCurrentPage(1);
+              }}>
                 <SelectTrigger className="w-[80px] bg-zinc-800/50 border-white/10 text-white text-sm">
                   <SelectValue />
                 </SelectTrigger>
@@ -425,7 +424,7 @@ export default function ParticipantTable({
 
             {/* Page info */}
             <div className="text-sm text-zinc-400">
-              Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredParticipants.length)} of {filteredParticipants.length} entries
+              Showing {((safeCurrentPage - 1) * pageSize) + 1} to {Math.min(safeCurrentPage * pageSize, filteredParticipants.length)} of {filteredParticipants.length} entries
             </div>
 
             {/* Page navigation */}
@@ -434,7 +433,7 @@ export default function ParticipantTable({
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
+                disabled={safeCurrentPage === 1}
                 className="border-white/10 text-white hover:bg-white/10 disabled:opacity-50 h-8 w-8 p-0"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -447,23 +446,23 @@ export default function ParticipantTable({
                   let pageNum;
                   if (totalPages <= 5) {
                     pageNum = i + 1;
-                  } else if (currentPage <= 3) {
+                  } else if (safeCurrentPage <= 3) {
                     pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
+                  } else if (safeCurrentPage >= totalPages - 2) {
                     pageNum = totalPages - 4 + i;
                   } else {
-                    pageNum = currentPage - 2 + i;
+                    pageNum = safeCurrentPage - 2 + i;
                   }
                   
                   return (
                     <Button
                       key={pageNum}
-                      variant={currentPage === pageNum ? 'default' : 'outline'}
+                      variant={safeCurrentPage === pageNum ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setCurrentPage(pageNum)}
                       className={`
                         h-8 w-8 p-0 text-sm font-medium
-                        ${currentPage === pageNum 
+                        ${safeCurrentPage === pageNum 
                           ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-0' 
                           : 'border-white/10 text-white hover:bg-white/10'
                         }
@@ -479,7 +478,7 @@ export default function ParticipantTable({
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages || totalPages === 0}
+                disabled={safeCurrentPage === totalPages || totalPages === 0}
                 className="border-white/10 text-white hover:bg-white/10 disabled:opacity-50 h-8 w-8 p-0"
               >
                 <ChevronRight className="w-4 h-4" />

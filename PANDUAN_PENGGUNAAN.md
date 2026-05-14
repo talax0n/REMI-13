@@ -46,7 +46,7 @@ Turnamen terdiri dari **6 fase**:
 | 5    | Semifinal      | **Top 20** berdasarkan total skor |
 | 6    | Final          | **Top 10** berdasarkan total skor |
 
-> **Catatan:** Setiap meja terdiri dari **5 pemain**. Sistem akan mengacak penempatan meja secara otomatis dengan memastikan anggota dari gereja yang sama tidak terlalu banyak duduk di meja yang sama.
+> **Catatan:** Setiap meja terdiri dari **5 pemain**. Sistem akan mengacak penempatan meja secara otomatis dengan memastikan anggota dari team yang sama tidak terlalu banyak duduk di meja yang sama.
 
 ---
 
@@ -69,7 +69,7 @@ Setelah login, Anda akan melihat dua tab: **Peserta** dan **Penilaian Meja**. Mu
 
 1. Di kolom kiri, temukan bagian **"Tambah Peserta"**.
 2. Isi **Nama** peserta.
-3. Pilih **Gereja** dari dropdown.
+3. Pilih **Team** dari dropdown.
 4. Klik tombol **Tambah**.
 
 ### Mengimpor Peserta dari File CSV (Massal)
@@ -79,7 +79,7 @@ Jika peserta sudah tercatat dalam file spreadsheet (Excel/Google Sheets):
 1. Ekspor file tersebut menjadi format **CSV**.
 2. Di kolom kiri, temukan bagian **"Import CSV"**.
 3. Klik tombol **Pilih File** dan pilih file CSV Anda.
-4. Pratinjau data akan ditampilkan — pastikan nama dan gereja sudah benar.
+4. Pratinjau data akan ditampilkan — pastikan nama dan team sudah benar.
 5. Klik **Import** untuk menyimpan semua peserta sekaligus.
 
 ### Menonaktifkan Peserta (Tidak Hadir / Belum Bayar)
@@ -111,7 +111,7 @@ Setelah semua peserta terdaftar dan aktif, langkah berikutnya adalah **mengacak 
 5. Klik **Konfirmasi** untuk melanjutkan.
 6. Sistem akan memproses dalam beberapa detik — meja akan muncul di tab **Penilaian Meja**.
 
-> **Algoritma Pengacakan:** Sistem secara otomatis memastikan anggota dari gereja yang sama tersebar ke meja yang berbeda, dan menghindari pertemuan ulang antar pemain yang sudah pernah satu meja di fase sebelumnya.
+> **Algoritma Pengacakan:** Sistem secara otomatis memastikan anggota dari team yang sama tersebar ke meja yang berbeda, dan menghindari pertemuan ulang antar pemain yang sudah pernah satu meja di fase sebelumnya.
 
 ---
 
@@ -169,7 +169,7 @@ Peserta dapat melihat skor dan peringkat mereka sendiri melalui halaman khusus.
 1. Peserta membuka kamera HP dan scan QR code.
 2. Browser akan terbuka ke halaman `/player`.
 3. Peserta mengetik nama mereka (ada autocomplete).
-4. Peserta memilih gereja mereka.
+4. Peserta memilih team mereka.
 5. Klik **"Cari Skor Saya"**.
 6. Peserta akan melihat:
    - Total skor kumulatif

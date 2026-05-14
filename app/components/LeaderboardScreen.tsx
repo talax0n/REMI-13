@@ -3,15 +3,15 @@
 import { motion } from 'framer-motion';
 import { Trophy, TrendingUp, TrendingDown, Medal, Award, XCircle } from 'lucide-react';
 import { Player } from './types';
-import { churchColors, defaultChurchColor } from './participants';
+import { teamColors, defaultTeamColor } from './participants';
 
 interface LeaderboardScreenProps {
   players: Player[];
   currentPhase?: number;
 }
 
-function getChurchStyle(church: string) {
-  return churchColors[church] || defaultChurchColor;
+function getTeamStyle(team: string) {
+  return teamColors[team] || defaultTeamColor;
 }
 
 function RankChange({ current, previous }: { current: number; previous?: number }) {
@@ -64,7 +64,7 @@ function RankBadge({ rank }: { rank: number }) {
 }
 
 function TopTenPlayer({ player, index }: { player: Player; index: number }) {
-  const churchStyle = getChurchStyle(player.church);
+  const teamStyle = getTeamStyle(player.team);
 
   return (
     <motion.div
@@ -91,7 +91,7 @@ function TopTenPlayer({ player, index }: { player: Player; index: number }) {
           <h3 className="font-bold text-white text-sm sm:text-base truncate">{player.name}</h3>
           <RankChange current={player.rank} previous={player.previousRank} />
         </div>
-        <span className={`text-xs sm:text-sm ${churchStyle.text}`}>{player.church}</span>
+        <span className={`text-xs sm:text-sm ${teamStyle.text}`}>{player.team}</span>
       </div>
 
       <div className="text-right">
@@ -104,7 +104,7 @@ function TopTenPlayer({ player, index }: { player: Player; index: number }) {
 }
 
 function PlayerRow({ player, index }: { player: Player; index: number }) {
-  const churchStyle = getChurchStyle(player.church);
+  const teamStyle = getTeamStyle(player.team);
 
   return (
     <motion.div
@@ -125,8 +125,8 @@ function PlayerRow({ player, index }: { player: Player; index: number }) {
         </div>
       </div>
 
-      <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded ${churchStyle.bg} ${churchStyle.text} whitespace-nowrap`}>
-        {player.church}
+      <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded ${teamStyle.bg} ${teamStyle.text} whitespace-nowrap`}>
+        {player.team}
       </span>
 
       <div className="w-14 sm:w-16 text-right">
@@ -139,7 +139,7 @@ function PlayerRow({ player, index }: { player: Player; index: number }) {
 }
 
 function EliminatedRow({ player, index }: { player: Player; index: number }) {
-  const churchStyle = getChurchStyle(player.church);
+  const teamStyle = getTeamStyle(player.team);
 
   return (
     <motion.div
@@ -159,8 +159,8 @@ function EliminatedRow({ player, index }: { player: Player; index: number }) {
         </span>
       </div>
 
-      <span className={`text-[10px] px-1.5 py-0.5 rounded ${churchStyle.bg} ${churchStyle.text} whitespace-nowrap`}>
-        {player.church}
+      <span className={`text-[10px] px-1.5 py-0.5 rounded ${teamStyle.bg} ${teamStyle.text} whitespace-nowrap`}>
+        {player.team}
       </span>
 
       <div className="w-14 sm:w-16 text-right">

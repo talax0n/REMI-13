@@ -1,6 +1,9 @@
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 import {
   getPlayerScores,
-  getPlayerByNameAndChurch,
+  getPlayerByNameAndTeam,
   syncFromAdminParticipants,
   resetAllPlayerScores,
   updatePlayerPhaseScore,
@@ -9,10 +12,10 @@ import {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const name = searchParams.get('name');
-  const church = searchParams.get('church');
+  const team = searchParams.get('team') ?? searchParams.get('church');
 
-  if (name && church) {
-    const player = await getPlayerByNameAndChurch(name, church);
+  if (name && team) {
+    const player = await getPlayerByNameAndTeam(name, team);
     if (player) {
       const allPlayers = (await getPlayerScores()).sort((a, b) => b.totalScore - a.totalScore);
       const rank = allPlayers.findIndex((p) => p.id === player.id) + 1;

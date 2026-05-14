@@ -1,0 +1,27 @@
+---
+Status: needs-triage
+Category: enhancement
+Source: user feedback 2026-05-14
+---
+
+# Penyisihan fixed at 4 rounds
+
+## Original feedback
+
+> Babak Penyisihan sebanyak 4 Babak
+
+## Summary
+
+Qualification phase runs exactly 4 rounds before semi-final selection. Verify current phase model supports this.
+
+## Codebase pointers
+
+- `app/admin/components/PhaseStatus.tsx` — phase tracker
+- Recent commit `bf36ed1` mentions 6-phase support — confirm penyisihan = rounds 1..4
+
+## Open questions
+
+- Hardcoded 4 or configurable by panitia?
+- What advances a round: all tables submitted scores, or admin click?
+
+## Comments
