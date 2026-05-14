@@ -522,12 +522,9 @@ function PlayerProfile({
             </div>
             <div className="min-w-0">
               <p className="text-xl sm:text-2xl font-bold text-white tabular-nums truncate">
-                {phases.length > 0
-                  ? Math.round(phases.reduce((sum, [, data]) => sum + data.points, 0) / phases.length).toLocaleString()
-                  : '0'
-                }
+                {phases.reduce((sum, [, data]) => sum + data.points, 0).toLocaleString()}
               </p>
-              <p className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider">Avg/Phase</p>
+              <p className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider">Total Points</p>
             </div>
           </div>
         </motion.div>

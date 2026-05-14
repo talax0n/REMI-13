@@ -22,6 +22,8 @@ interface TournamentStateRow {
   max_phases: number;
   semifinal_cutoff: number;
   final_cutoff: number;
+  semifinal_phase: number;
+  final_phase: number;
 }
 
 function normalizeSemifinalCutoff(value: unknown): 10 | 20 {
@@ -32,13 +34,36 @@ function normalizeFinalCutoff(value: unknown): 5 | 10 {
   return value === 5 ? 5 : 10;
 }
 
+function normalizePositiveInt(value: unknown, fallback: number): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n) || n < 1) return fallback;
+  return Math.floor(n);
+}
+
+function normalizePhaseConfig(input: {
+  maxPhases: unknown;
+  semifinalPhase: unknown;
+  finalPhase: unknown;
+}): { maxPhases: number; semifinalPhase: number; finalPhase: number } {
+  const maxPhases = Math.max(2, normalizePositiveInt(input.maxPhases, 6));
+  const finalPhase = Math.min(
+    maxPhases,
+    Math.max(2, normalizePositiveInt(input.finalPhase, maxPhases))
+  );
+  const semifinalPhase = Math.min(
+    finalPhase - 1,
+    Math.max(1, normalizePositiveInt(input.semifinalPhase, finalPhase - 1))
+  );
+  return { maxPhases, semifinalPhase, finalPhase };
+}
+
 export async function GET() {
   await ensureMigrated();
 
   const [playerRows, stateRows] = await Promise.all([
     query<PlayerRow>('SELECT * FROM players ORDER BY total_score DESC'),
     query<TournamentStateRow>(
-      'SELECT phase, status, max_phases, semifinal_cutoff, final_cutoff FROM tournament_state WHERE id = 1'
+      'SELECT phase, status, max_phases, semifinal_cutoff, final_cutoff, semifinal_phase, final_phase FROM tournament_state WHERE id = 1'
     ),
   ]);
 
@@ -48,6 +73,8 @@ export async function GET() {
     max_phases: 6,
     semifinal_cutoff: 20,
     final_cutoff: 10,
+    semifinal_phase: 5,
+    final_phase: 6,
   };
 
   const participants: AdminParticipant[] = playerRows.map((row) => ({
@@ -73,6 +100,11 @@ export async function GET() {
   );
 
   const activeCount = participants.filter((p) => p.status === 'active').length;
+  const phaseConfig = normalizePhaseConfig({
+    maxPhases: tournamentState.max_phases,
+    semifinalPhase: tournamentState.semifinal_phase,
+    finalPhase: tournamentState.final_phase,
+  });
   return Response.json({
     participants,
     phaseScores,
@@ -81,8 +113,10 @@ export async function GET() {
       status: tournamentState.status,
       totalParticipants: activeCount,
       totalTables: Math.ceil(activeCount / 5),
-      maxPhases: tournamentState.max_phases,
-      isFinalPhase: tournamentState.phase >= tournamentState.max_phases,
+      maxPhases: phaseConfig.maxPhases,
+      semifinalPhase: phaseConfig.semifinalPhase,
+      finalPhase: phaseConfig.finalPhase,
+      isFinalPhase: tournamentState.phase >= phaseConfig.finalPhase,
       semifinalCutoff: normalizeSemifinalCutoff(tournamentState.semifinal_cutoff),
       finalCutoff: normalizeFinalCutoff(tournamentState.final_cutoff),
     },
@@ -98,7 +132,12 @@ export async function POST(request: Request) {
       query('DELETE FROM game_tables'),
       query(
         `UPDATE tournament_state
-         SET phase = 1, status = 'waiting', max_phases = 6, updated_at = NOW()
+         SET phase = 1,
+             status = 'waiting',
+             max_phases = 6,
+             semifinal_phase = 5,
+             final_phase = 6,
+             updated_at = NOW()
          WHERE id = 1`
       ),
     ]);
@@ -112,6 +151,8 @@ export async function POST(request: Request) {
         totalParticipants: 0,
         totalTables: 0,
         maxPhases: 6,
+        semifinalPhase: 5,
+        finalPhase: 6,
         isFinalPhase: false,
         semifinalCutoff: 20,
         finalCutoff: 10,
@@ -119,7 +160,8 @@ export async function POST(request: Request) {
     });
   }
 
-  const { phase, status, maxPhases, semifinalCutoff, finalCutoff } = body;
+  const { phase, status, maxPhases, semifinalCutoff, finalCutoff, semifinalPhase, finalPhase } = body;
+  const phaseConfig = normalizePhaseConfig({ maxPhases, semifinalPhase, finalPhase });
 
   await query(
     `UPDATE tournament_state
@@ -128,14 +170,18 @@ export async function POST(request: Request) {
          max_phases = $3,
          semifinal_cutoff = $4,
          final_cutoff = $5,
+         semifinal_phase = $6,
+         final_phase = $7,
          updated_at = NOW()
      WHERE id = 1`,
     [
       phase,
       status,
-      maxPhases,
+      phaseConfig.maxPhases,
       normalizeSemifinalCutoff(semifinalCutoff),
       normalizeFinalCutoff(finalCutoff),
+      phaseConfig.semifinalPhase,
+      phaseConfig.finalPhase,
     ]
   );
 

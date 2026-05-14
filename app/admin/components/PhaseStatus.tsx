@@ -13,16 +13,17 @@ interface PhaseStatusProps {
   finalCutoff?: 5 | 10;
 }
 
-function getPhaseLabel(phase: number, semifinalCutoff = 20, finalCutoff = 10): string {
-  const phaseLabels: Record<number, string> = {
-  1: 'Fase Reguler 1',
-  2: 'Fase Reguler 2',
-  3: 'Fase Reguler 3',
-  4: 'Fase Reguler 4',
-    5: `Semifinal (Top ${semifinalCutoff})`,
-    6: `Final (Top ${finalCutoff})`,
-  };
-  return phaseLabels[phase] ?? `Phase ${phase}`;
+function getPhaseLabel(
+  phase: number,
+  semifinalPhase: number,
+  finalPhase: number,
+  semifinalCutoff = 20,
+  finalCutoff = 10,
+): string {
+  if (phase === finalPhase) return `Final (Top ${finalCutoff})`;
+  if (phase === semifinalPhase) return `Semifinal (Top ${semifinalCutoff})`;
+  if (phase < semifinalPhase) return `Fase Reguler ${phase}`;
+  return `Phase ${phase}`;
 }
 
 const statusConfig = {
@@ -71,7 +72,7 @@ export default function PhaseStatus({ state, semifinalCutoff, finalCutoff }: Pha
               <p className="text-2xl font-bold text-white">
                 Phase {state.phase} 
                 <span className="text-base font-normal text-zinc-400 ml-2">
-                  {getPhaseLabel(state.phase, semifinalCutoff, finalCutoff)}
+                  {getPhaseLabel(state.phase, state.semifinalPhase, state.finalPhase, semifinalCutoff, finalCutoff)}
                 </span>
               </p>
             </div>

@@ -67,6 +67,8 @@ async function runMigration(): Promise<void> {
         max_phases INTEGER NOT NULL DEFAULT 5,
         semifinal_cutoff INTEGER NOT NULL DEFAULT 20,
         final_cutoff INTEGER NOT NULL DEFAULT 10,
+        semifinal_phase INTEGER NOT NULL DEFAULT 5,
+        final_phase INTEGER NOT NULL DEFAULT 6,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
 
@@ -90,6 +92,20 @@ async function runMigration(): Promise<void> {
           WHERE table_name = 'tournament_state' AND column_name = 'final_cutoff'
         ) THEN
           ALTER TABLE tournament_state ADD COLUMN final_cutoff INTEGER NOT NULL DEFAULT 10;
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'tournament_state' AND column_name = 'semifinal_phase'
+        ) THEN
+          ALTER TABLE tournament_state ADD COLUMN semifinal_phase INTEGER NOT NULL DEFAULT 5;
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'tournament_state' AND column_name = 'final_phase'
+        ) THEN
+          ALTER TABLE tournament_state ADD COLUMN final_phase INTEGER NOT NULL DEFAULT 6;
         END IF;
 
         IF EXISTS (

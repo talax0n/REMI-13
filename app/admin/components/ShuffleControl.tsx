@@ -22,6 +22,8 @@ interface ShuffleControlProps {
   targetPhase: number;
   semifinalCutoff: 10 | 20;
   finalCutoff: 5 | 10;
+  scoredSeatedCount: number;
+  totalSeatedCount: number;
   onSemifinalCutoffChange: (cutoff: 10 | 20) => void;
   onFinalCutoffChange: (cutoff: 5 | 10) => void;
   onShuffle: () => Promise<{ warnings: string[] }>;
@@ -33,6 +35,8 @@ export default function ShuffleControl({
   targetPhase,
   semifinalCutoff,
   finalCutoff,
+  scoredSeatedCount,
+  totalSeatedCount,
   onSemifinalCutoffChange,
   onFinalCutoffChange,
   onShuffle,
@@ -40,6 +44,14 @@ export default function ShuffleControl({
 }: ShuffleControlProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isShuffling, setIsShuffling] = useState(false);
+  const [isPartialScoreAlertOpen, setIsPartialScoreAlertOpen] = useState(false);
+  const [partialScoreAcknowledged, setPartialScoreAcknowledged] = useState(false);
+
+  const hasPartialScores =
+    totalSeatedCount > 0
+    && scoredSeatedCount > 0
+    && scoredSeatedCount < totalSeatedCount;
+  const missingScoreCount = Math.max(totalSeatedCount - scoredSeatedCount, 0);
 
   const canShuffle = state.phase < state.maxPhases && state.totalParticipants >= 1;
   const isPhaseComplete = state.status === 'completed';
@@ -57,6 +69,16 @@ export default function ShuffleControl({
       }
       return;
     }
+    if (hasPartialScores) {
+      setPartialScoreAcknowledged(false);
+      setIsPartialScoreAlertOpen(true);
+      return;
+    }
+    setIsDialogOpen(true);
+  };
+
+  const handlePartialScoreContinue = () => {
+    setIsPartialScoreAlertOpen(false);
     setIsDialogOpen(true);
   };
 
@@ -69,8 +91,8 @@ export default function ShuffleControl({
     try {
       const result = await onShuffle();
       const label =
-        targetPhase === 5 ? `Semifinal (Top ${semifinalCutoff})` :
-        targetPhase === 6 ? `Final (Top ${finalCutoff})` :
+        targetPhase === state.semifinalPhase ? `Semifinal (Top ${semifinalCutoff})` :
+        targetPhase === state.finalPhase ? `Final (Top ${finalCutoff})` :
         `Fase ${targetPhase}`;
       toast.success('Meja berhasil dibuat', {
         id: 'shuffle',
@@ -137,6 +159,16 @@ export default function ShuffleControl({
             </Alert>
           )}
 
+          {canShuffle && hasPartialScores && (
+            <Alert className="bg-red-500/10 border-red-500/30 text-red-300">
+              <AlertTriangle className="w-4 h-4" />
+              <AlertDescription className="text-red-200">
+                {scoredSeatedCount} dari {totalSeatedCount} pemain sudah punya skor untuk Fase {state.phase}.
+                Generate ulang sekarang akan membuang skor tersebut. Lengkapi skor {missingScoreCount} pemain lain dulu untuk lanjut ke fase berikutnya.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Primary Action Button */}
           <AnimatePresence mode="wait">
             <motion.div
@@ -178,15 +210,15 @@ export default function ShuffleControl({
               Konfirmasi Generate Meja
             </DialogTitle>
             <DialogDescription className="text-zinc-400">
-              {targetPhase === 5
-                ? `Akan memilih ${semifinalCutoff} pemain teratas untuk Semifinal (Fase 5).`
-                : targetPhase === 6
-                ? `Akan memilih ${finalCutoff} pemain teratas untuk Final (Fase 6).`
+              {targetPhase === state.semifinalPhase
+                ? `Akan memilih ${semifinalCutoff} pemain teratas untuk Semifinal (Fase ${state.semifinalPhase}).`
+                : targetPhase === state.finalPhase
+                ? `Akan memilih ${finalCutoff} pemain teratas untuk Final (Fase ${state.finalPhase}).`
                 : `Akan men-shuffle meja untuk Fase ${targetPhase}.`}
             </DialogDescription>
           </DialogHeader>
 
-          {targetPhase === 5 && (
+          {targetPhase === state.semifinalPhase && (
             <div className="space-y-2">
               <p className="text-sm font-medium text-zinc-300">Semifinal cutoff</p>
               <div className="grid grid-cols-2 gap-2">
@@ -205,7 +237,7 @@ export default function ShuffleControl({
             </div>
           )}
 
-          {targetPhase === 6 && (
+          {targetPhase === state.finalPhase && (
             <div className="space-y-2">
               <p className="text-sm font-medium text-zinc-300">Final cutoff</p>
               <div className="grid grid-cols-2 gap-2">
@@ -227,9 +259,9 @@ export default function ShuffleControl({
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 my-4">
             <p className="text-sm text-yellow-400">
               <strong>Peringatan:</strong>{' '}
-              {targetPhase === 5
+              {targetPhase === state.semifinalPhase
                 ? `Pemain di luar Top ${semifinalCutoff} akan dieliminasi.`
-                : targetPhase === 6
+                : targetPhase === state.finalPhase
                 ? `Pemain di luar Top ${finalCutoff} akan dieliminasi.`
                 : 'Semua penugasan meja saat ini akan diganti.'}
             </p>
@@ -249,6 +281,78 @@ export default function ShuffleControl({
             >
               <Shuffle className="w-4 h-4 mr-2" />
               Confirm Shuffle
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isPartialScoreAlertOpen} onOpenChange={(open) => {
+        setIsPartialScoreAlertOpen(open);
+        if (!open) setPartialScoreAcknowledged(false);
+      }}>
+        <DialogContent className="bg-zinc-900 border-red-500/40 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-300">
+              <AlertTriangle className="w-5 h-5 text-red-400" />
+              Skor Belum Lengkap
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Sebagian pemain sudah punya skor untuk Fase {state.phase}, tapi belum semua.
+              Men-generate ulang sekarang akan menyusun ulang meja dan membuang skor yang sudah masuk.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2 rounded-lg border border-white/10 bg-zinc-800/40 p-3 text-center">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-500">Sudah skor</p>
+                <p className="text-xl font-bold text-emerald-400 tabular-nums">{scoredSeatedCount}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-500">Belum skor</p>
+                <p className="text-xl font-bold text-red-400 tabular-nums">{missingScoreCount}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-500">Total seated</p>
+                <p className="text-xl font-bold text-white tabular-nums">{totalSeatedCount}</p>
+              </div>
+            </div>
+
+            <Alert className="bg-red-500/10 border-red-500/30 text-red-300">
+              <AlertTriangle className="w-4 h-4" />
+              <AlertDescription className="text-red-200">
+                <span className="font-semibold">{scoredSeatedCount} skor</span> yang sudah diinput akan hilang.
+                Untuk maju ke fase berikutnya, lengkapi skor {missingScoreCount} pemain yang belum diinput.
+              </AlertDescription>
+            </Alert>
+
+            <label className="flex items-start gap-2 rounded-lg border border-white/10 bg-zinc-800/40 p-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={partialScoreAcknowledged}
+                onChange={(e) => setPartialScoreAcknowledged(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-white/20 bg-zinc-900 accent-red-500"
+              />
+              <span className="text-sm text-zinc-300">
+                Saya mengerti dan tetap ingin menyusun ulang meja sekarang. Skor yang sudah masuk akan dibuang.
+              </span>
+            </label>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsPartialScoreAlertOpen(false)}
+              className="border-white/20 text-white hover:bg-white/10"
+            >
+              Kembali, lengkapi skor
+            </Button>
+            <Button
+              onClick={handlePartialScoreContinue}
+              disabled={!partialScoreAcknowledged}
+              className="bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Lanjut Shuffle
             </Button>
           </DialogFooter>
         </DialogContent>

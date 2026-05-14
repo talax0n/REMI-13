@@ -8,6 +8,7 @@ import ParticipantForm from './components/ParticipantForm';
 import BulkImportUploader from './components/BulkImportUploader';
 import ParticipantTable from './components/ParticipantTable';
 import PhaseStatus from './components/PhaseStatus';
+import PhaseConfig from './components/PhaseConfig';
 import TableScoring from './components/TableScoring';
 import PlayerQRCode from './components/PlayerQRCode';
 import { Button } from '@/components/ui/button';
@@ -112,6 +113,8 @@ export default function AdminPage() {
     totalParticipants: 0,
     totalTables: 0,
     maxPhases: 6,
+    semifinalPhase: 5,
+    finalPhase: 6,
     isFinalPhase: false,
     semifinalCutoff: 20,
     finalCutoff: 10,
@@ -135,14 +138,23 @@ export default function AdminPage() {
   const syncEnabled = useRef(false);
 
   const teams = useMemo(() => extractTeams(participants), [participants]);
-  const currentPhaseHasScores = useMemo(() => {
-    const seatedActive = participants.filter(
-      (p) => p.status === 'active' && p.tableNumber !== undefined
-    );
-    return seatedActive.length > 0 && seatedActive.every(
-      (p) => phaseScores[p.id]?.[tournamentState.phase] !== undefined
-    );
-  }, [participants, phaseScores, tournamentState.phase]);
+  const seatedActiveParticipants = useMemo(
+    () =>
+      participants.filter(
+        (p) => p.status === 'active' && p.tableNumber !== undefined
+      ),
+    [participants]
+  );
+  const seatedActiveScoredCount = useMemo(
+    () =>
+      seatedActiveParticipants.filter(
+        (p) => phaseScores[p.id]?.[tournamentState.phase] !== undefined
+      ).length,
+    [phaseScores, seatedActiveParticipants, tournamentState.phase]
+  );
+  const currentPhaseHasScores =
+    seatedActiveParticipants.length > 0
+    && seatedActiveScoredCount === seatedActiveParticipants.length;
   const shuffleTargetPhase = currentPhaseHasScores
     ? Math.min(tournamentState.phase + 1, tournamentState.maxPhases)
     : tournamentState.phase;
@@ -159,6 +171,8 @@ export default function AdminPage() {
         phase: next.phase,
         status: next.status,
         maxPhases: next.maxPhases,
+        semifinalPhase: next.semifinalPhase,
+        finalPhase: next.finalPhase,
         semifinalCutoff: nextSemifinalCutoff,
         finalCutoff: nextFinalCutoff,
       }),
@@ -241,8 +255,8 @@ export default function AdminPage() {
     await new Promise((resolve) => setTimeout(resolve, 1500));
     const participantsWithCurrentHistory = recordTableOpponentHistory(participants);
 
-    // Target phase 6 → Final (top 5 or 10, using the same pairing constraints)
-    if (shuffleTargetPhase === 6) {
+    // Final phase → top N (cutoff-defined finalists)
+    if (shuffleTargetPhase === tournamentState.finalPhase) {
       const sorted = [...participantsWithCurrentHistory]
         .filter((p) => p.status === 'active')
         .sort((a, b) => b.score - a.score);
@@ -284,7 +298,7 @@ export default function AdminPage() {
             eliminatedAtPhase: undefined,
           };
         }
-        if (p.status === 'active') return { ...p, status: 'eliminated' as const, tableNumber: undefined, eliminatedAtPhase: 5 };
+        if (p.status === 'active') return { ...p, status: 'eliminated' as const, tableNumber: undefined, eliminatedAtPhase: tournamentState.semifinalPhase };
         return p;
       });
 
@@ -299,8 +313,8 @@ export default function AdminPage() {
       return { warnings: shuffleResult.warnings };
     }
 
-    // Target phase 5 → Semifinal (top 10 or 20)
-    if (shuffleTargetPhase === 5) {
+    // Semifinal phase → top N (cutoff-defined semifinalists)
+    if (shuffleTargetPhase === tournamentState.semifinalPhase) {
       const sorted = [...participantsWithCurrentHistory]
         .filter((p) => p.status === 'active')
         .sort((a, b) => b.score - a.score);
@@ -342,8 +356,8 @@ export default function AdminPage() {
             opponents: opponentsMap.get(p.id) ?? p.opponents,
           };
         }
-        // Not in top 20 → eliminated
-        return { ...p, status: 'eliminated' as const, tableNumber: undefined, eliminatedAtPhase: 4 };
+        // Outside semifinal cutoff → eliminated at last regular phase
+        return { ...p, status: 'eliminated' as const, tableNumber: undefined, eliminatedAtPhase: Math.max(1, tournamentState.semifinalPhase - 1) };
       });
 
       setParticipants(updated);
@@ -399,7 +413,7 @@ export default function AdminPage() {
 
     setParticipants(updated);
     return { warnings };
-  }, [finalCutoff, participants, semifinalCutoff, shuffleTargetPhase]);
+  }, [finalCutoff, participants, semifinalCutoff, shuffleTargetPhase, tournamentState.finalPhase, tournamentState.semifinalPhase]);
 
   // Mark generated phase as active.
   const handlePhaseComplete = useCallback((targetPhase: number) => {
@@ -408,6 +422,7 @@ export default function AdminPage() {
         ...prev,
         phase: targetPhase,
         status: 'in_progress' as TournamentState['status'],
+        isFinalPhase: targetPhase >= prev.finalPhase,
       };
       persistTournamentState(next);
       return next;
@@ -482,6 +497,31 @@ export default function AdminPage() {
       return next;
     });
   }, [persistTournamentState, semifinalCutoff]);
+
+  const handlePhaseConfigChange = useCallback((
+    maxPhases: number,
+    semifinalPhase: number,
+    finalPhase: number,
+  ) => {
+    const safeMax = Math.max(2, Math.floor(maxPhases));
+    const safeFinal = Math.min(safeMax, Math.max(2, Math.floor(finalPhase)));
+    const safeSemifinal = Math.min(safeFinal - 1, Math.max(1, Math.floor(semifinalPhase)));
+    setTournamentState((prev) => {
+      const next: TournamentState = {
+        ...prev,
+        maxPhases: safeMax,
+        semifinalPhase: safeSemifinal,
+        finalPhase: safeFinal,
+        phase: Math.min(prev.phase, safeMax),
+        isFinalPhase: prev.phase >= safeFinal,
+      };
+      persistTournamentState(next);
+      return next;
+    });
+    toast.success('Konfigurasi fase tersimpan', {
+      description: `Total ${safeMax} fase · Semifinal di Fase ${safeSemifinal} · Final di Fase ${safeFinal}.`,
+    });
+  }, [persistTournamentState]);
 
   const handleResetDatabase = useCallback(async () => {
     const response = await fetch('/api/admin', {
@@ -893,6 +933,8 @@ export default function AdminPage() {
                   targetPhase={shuffleTargetPhase}
                   semifinalCutoff={semifinalCutoff}
                   finalCutoff={finalCutoff}
+                  scoredSeatedCount={seatedActiveScoredCount}
+                  totalSeatedCount={seatedActiveParticipants.length}
                   onSemifinalCutoffChange={handleSemifinalCutoffChange}
                   onFinalCutoffChange={handleFinalCutoffChange}
                   onShuffle={handleShuffle}
@@ -915,9 +957,9 @@ export default function AdminPage() {
                   <button
                     type="button"
                     onClick={() => setShowBulkImport(true)}
-                    className="group flex items-center gap-3 p-4 rounded-xl bg-zinc-900/50 border border-white/10 hover:border-purple-500/40 hover:bg-zinc-800/60 active:scale-[0.99] transition text-left"
+                    className="group flex items-center gap-3 p-4 rounded-xl bg-zinc-900/50 border border-white/10 hover:border-cyan-500/40 hover:bg-zinc-800/60 active:scale-[0.99] transition text-left"
                   >
-                    <div className="w-10 h-10 shrink-0 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center group-hover:bg-purple-500/25">
+                    <div className="w-10 h-10 shrink-0 rounded-lg bg-cyan-500/15 text-cyan-400 flex items-center justify-center group-hover:bg-cyan-500/25">
                       <FileSpreadsheet className="w-5 h-5" />
                     </div>
                     <div className="min-w-0">
@@ -925,6 +967,15 @@ export default function AdminPage() {
                       <p className="text-xs text-zinc-500">Upload Excel / CSV</p>
                     </div>
                   </button>
+                  <div className="sm:col-span-2">
+                    <PhaseConfig
+                      maxPhases={tournamentState.maxPhases}
+                      semifinalPhase={tournamentState.semifinalPhase}
+                      finalPhase={tournamentState.finalPhase}
+                      currentPhase={tournamentState.phase}
+                      onChange={handlePhaseConfigChange}
+                    />
+                  </div>
                 </div>
               </div>
 
