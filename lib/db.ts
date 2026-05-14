@@ -65,6 +65,8 @@ async function runMigration(): Promise<void> {
         phase INTEGER NOT NULL DEFAULT 1,
         status TEXT NOT NULL DEFAULT 'waiting',
         max_phases INTEGER NOT NULL DEFAULT 5,
+        semifinal_cutoff INTEGER NOT NULL DEFAULT 20,
+        final_cutoff INTEGER NOT NULL DEFAULT 10,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
 
@@ -76,6 +78,20 @@ async function runMigration(): Promise<void> {
     await client.query(`
       DO $$
       BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'tournament_state' AND column_name = 'semifinal_cutoff'
+        ) THEN
+          ALTER TABLE tournament_state ADD COLUMN semifinal_cutoff INTEGER NOT NULL DEFAULT 20;
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'tournament_state' AND column_name = 'final_cutoff'
+        ) THEN
+          ALTER TABLE tournament_state ADD COLUMN final_cutoff INTEGER NOT NULL DEFAULT 10;
+        END IF;
+
         IF EXISTS (
           SELECT 1 FROM information_schema.columns
           WHERE table_name = 'players' AND column_name = 'church'

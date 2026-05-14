@@ -83,6 +83,8 @@ export default function AdminPage() {
     totalTables: 0,
     maxPhases: 6,
     isFinalPhase: false,
+    semifinalCutoff: 20,
+    finalCutoff: 10,
   });
   const [activeTab, setActiveTab] = useState<TabType>('participants');
   const [showQRCode, setShowQRCode] = useState(false);
@@ -101,6 +103,24 @@ export default function AdminPage() {
 
   const teams = useMemo(() => extractTeams(participants), [participants]);
 
+  const persistTournamentState = useCallback((
+    next: TournamentState,
+    nextSemifinalCutoff = semifinalCutoff,
+    nextFinalCutoff = finalCutoff
+  ) => {
+    fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phase: next.phase,
+        status: next.status,
+        maxPhases: next.maxPhases,
+        semifinalCutoff: nextSemifinalCutoff,
+        finalCutoff: nextFinalCutoff,
+      }),
+    }).catch(console.error);
+  }, [finalCutoff, semifinalCutoff]);
+
   // Load state from DB on mount
   useEffect(() => {
     fetch('/api/admin')
@@ -108,6 +128,8 @@ export default function AdminPage() {
       .then((data) => {
         setParticipants(data.participants);
         setTournamentState(data.tournamentState);
+        setSemifinalCutoff(data.tournamentState.semifinalCutoff ?? 20);
+        setFinalCutoff(data.tournamentState.finalCutoff ?? 10);
         // Enable syncing only AFTER the initial load settles.
         // requestAnimationFrame ensures the participants useEffect triggered by
         // setParticipants above has already fired (and been skipped) before we
@@ -352,14 +374,10 @@ export default function AdminPage() {
         phase: Math.min(prev.phase + 1, prev.maxPhases),
         status: (prev.phase + 1 >= prev.maxPhases ? 'completed' : 'waiting') as TournamentState['status'],
       };
-      fetch('/api/admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phase: next.phase, status: next.status, maxPhases: next.maxPhases }),
-      }).catch(console.error);
+      persistTournamentState(next);
       return next;
     });
-  }, []);
+  }, [persistTournamentState]);
 
   // Go back to previous phase
   const handlePhaseBack = useCallback(() => {
@@ -371,11 +389,7 @@ export default function AdminPage() {
         status: 'waiting' as TournamentState['status'],
         isFinalPhase: false,
       };
-      fetch('/api/admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phase: next.phase, status: next.status, maxPhases: next.maxPhases }),
-      }).catch(console.error);
+      persistTournamentState(next);
       return next;
     });
     // Restore players that were eliminated at or after the phase we're going back to
@@ -390,7 +404,7 @@ export default function AdminPage() {
       });
     });
     setShowPhaseBackWarning(false);
-  }, [tournamentState.phase]);
+  }, [persistTournamentState, tournamentState.phase]);
 
   // Reset all scores (set all participant scores to 0)
   const handleResetAllScores = useCallback(async () => {
@@ -416,6 +430,24 @@ export default function AdminPage() {
     window.location.href = '/api/admin/tables/export';
   }, []);
 
+  const handleSemifinalCutoffChange = useCallback((cutoff: 10 | 20) => {
+    setSemifinalCutoff(cutoff);
+    setTournamentState((prev) => {
+      const next = { ...prev, semifinalCutoff: cutoff };
+      persistTournamentState(next, cutoff, finalCutoff);
+      return next;
+    });
+  }, [finalCutoff, persistTournamentState]);
+
+  const handleFinalCutoffChange = useCallback((cutoff: 5 | 10) => {
+    setFinalCutoff(cutoff);
+    setTournamentState((prev) => {
+      const next = { ...prev, finalCutoff: cutoff };
+      persistTournamentState(next, semifinalCutoff, cutoff);
+      return next;
+    });
+  }, [persistTournamentState, semifinalCutoff]);
+
   const handleResetDatabase = useCallback(async () => {
     const response = await fetch('/api/admin', {
       method: 'POST',
@@ -431,6 +463,8 @@ export default function AdminPage() {
     const data = await response.json();
     setParticipants(data.participants);
     setTournamentState(data.tournamentState);
+    setSemifinalCutoff(data.tournamentState.semifinalCutoff ?? 20);
+    setFinalCutoff(data.tournamentState.finalCutoff ?? 10);
     setPhaseScores({});
     setShowResetWarning(false);
 
@@ -720,8 +754,8 @@ export default function AdminPage() {
                   state={tournamentState}
                   semifinalCutoff={semifinalCutoff}
                   finalCutoff={finalCutoff}
-                  onSemifinalCutoffChange={setSemifinalCutoff}
-                  onFinalCutoffChange={setFinalCutoff}
+                  onSemifinalCutoffChange={handleSemifinalCutoffChange}
+                  onFinalCutoffChange={handleFinalCutoffChange}
                   onShuffle={handleShuffle}
                   onPhaseComplete={handlePhaseComplete}
                 />

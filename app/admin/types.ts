@@ -17,6 +17,8 @@ export interface TournamentState {
   totalTables: number;
   maxPhases: number;
   isFinalPhase: boolean;
+  semifinalCutoff: 10 | 20;
+  finalCutoff: 5 | 10;
   finalTableA?: number[]; // Player ranks: 1, 3, 5, 7, 9
   finalTableB?: number[]; // Player ranks: 2, 4, 6, 8, 10
 }

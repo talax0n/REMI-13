@@ -19,6 +19,16 @@ interface TournamentStateRow {
   phase: number;
   status: string;
   max_phases: number;
+  semifinal_cutoff: number;
+  final_cutoff: number;
+}
+
+function normalizeSemifinalCutoff(value: unknown): 10 | 20 {
+  return value === 10 ? 10 : 20;
+}
+
+function normalizeFinalCutoff(value: unknown): 5 | 10 {
+  return value === 5 ? 5 : 10;
 }
 
 export async function GET() {
@@ -26,10 +36,18 @@ export async function GET() {
 
   const [playerRows, stateRows] = await Promise.all([
     query<PlayerRow>('SELECT * FROM players ORDER BY total_score DESC'),
-    query<TournamentStateRow>('SELECT phase, status, max_phases FROM tournament_state WHERE id = 1'),
+    query<TournamentStateRow>(
+      'SELECT phase, status, max_phases, semifinal_cutoff, final_cutoff FROM tournament_state WHERE id = 1'
+    ),
   ]);
 
-  const tournamentState = stateRows[0] ?? { phase: 1, status: 'in_progress', max_phases: 6 };
+  const tournamentState = stateRows[0] ?? {
+    phase: 1,
+    status: 'in_progress',
+    max_phases: 6,
+    semifinal_cutoff: 20,
+    final_cutoff: 10,
+  };
 
   const participants: AdminParticipant[] = playerRows.map((row) => ({
     id: row.id,
@@ -52,6 +70,8 @@ export async function GET() {
       totalTables: Math.ceil(activeCount / 5),
       maxPhases: tournamentState.max_phases,
       isFinalPhase: tournamentState.phase >= tournamentState.max_phases,
+      semifinalCutoff: normalizeSemifinalCutoff(tournamentState.semifinal_cutoff),
+      finalCutoff: normalizeFinalCutoff(tournamentState.final_cutoff),
     },
   });
 }
@@ -80,17 +100,30 @@ export async function POST(request: Request) {
         totalTables: 0,
         maxPhases: 6,
         isFinalPhase: false,
+        semifinalCutoff: 20,
+        finalCutoff: 10,
       },
     });
   }
 
-  const { phase, status, maxPhases } = body;
+  const { phase, status, maxPhases, semifinalCutoff, finalCutoff } = body;
 
   await query(
     `UPDATE tournament_state
-     SET phase = $1, status = $2, max_phases = $3, updated_at = NOW()
+     SET phase = $1,
+         status = $2,
+         max_phases = $3,
+         semifinal_cutoff = $4,
+         final_cutoff = $5,
+         updated_at = NOW()
      WHERE id = 1`,
-    [phase, status, maxPhases]
+    [
+      phase,
+      status,
+      maxPhases,
+      normalizeSemifinalCutoff(semifinalCutoff),
+      normalizeFinalCutoff(finalCutoff),
+    ]
   );
 
   return Response.json({ ok: true });
