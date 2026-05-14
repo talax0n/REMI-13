@@ -156,4 +156,4 @@ export async function syncFromAdminParticipants(
   );
 }
 
-export const MAX_PHASES = 5;
+export const MAX_PHASES = 6;
