@@ -9,16 +9,21 @@ import { TournamentState } from '../types';
 
 interface PhaseStatusProps {
   state: TournamentState;
+  semifinalCutoff?: 10 | 20;
+  finalCutoff?: 5 | 10;
 }
 
-const phaseLabels: Record<number, string> = {
+function getPhaseLabel(phase: number, semifinalCutoff = 20, finalCutoff = 10): string {
+  const phaseLabels: Record<number, string> = {
   1: 'Fase Reguler 1',
   2: 'Fase Reguler 2',
   3: 'Fase Reguler 3',
   4: 'Fase Reguler 4',
-  5: 'Semifinal (Top 20)',
-  6: 'Final (Top 10)',
-};
+    5: `Semifinal (Top ${semifinalCutoff})`,
+    6: `Final (Top ${finalCutoff})`,
+  };
+  return phaseLabels[phase] ?? `Phase ${phase}`;
+}
 
 const statusConfig = {
   waiting: {
@@ -41,7 +46,7 @@ const statusConfig = {
   },
 };
 
-export default function PhaseStatus({ state }: PhaseStatusProps) {
+export default function PhaseStatus({ state, semifinalCutoff, finalCutoff }: PhaseStatusProps) {
   const StatusIcon = statusConfig[state.status].icon;
   const progress = (state.phase / state.maxPhases) * 100;
 
@@ -66,7 +71,7 @@ export default function PhaseStatus({ state }: PhaseStatusProps) {
               <p className="text-2xl font-bold text-white">
                 Phase {state.phase} 
                 <span className="text-base font-normal text-zinc-400 ml-2">
-                  {phaseLabels[state.phase]}
+                  {getPhaseLabel(state.phase, semifinalCutoff, finalCutoff)}
                 </span>
               </p>
             </div>

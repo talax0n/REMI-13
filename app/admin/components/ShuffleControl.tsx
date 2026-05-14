@@ -19,11 +19,23 @@ import { toast } from 'sonner';
 
 interface ShuffleControlProps {
   state: TournamentState;
+  semifinalCutoff: 10 | 20;
+  finalCutoff: 5 | 10;
+  onSemifinalCutoffChange: (cutoff: 10 | 20) => void;
+  onFinalCutoffChange: (cutoff: 5 | 10) => void;
   onShuffle: () => Promise<void>;
   onPhaseComplete: () => void;
 }
 
-export default function ShuffleControl({ state, onShuffle, onPhaseComplete }: ShuffleControlProps) {
+export default function ShuffleControl({
+  state,
+  semifinalCutoff,
+  finalCutoff,
+  onSemifinalCutoffChange,
+  onFinalCutoffChange,
+  onShuffle,
+  onPhaseComplete,
+}: ShuffleControlProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isShuffling, setIsShuffling] = useState(false);
 
@@ -55,8 +67,8 @@ export default function ShuffleControl({ state, onShuffle, onPhaseComplete }: Sh
     try {
       await onShuffle();
       const label =
-        state.phase === 4 ? 'Semifinal (Top 20)' :
-        state.phase === 5 ? 'Final (Top 10)' :
+        state.phase === 4 ? `Semifinal (Top ${semifinalCutoff})` :
+        state.phase === 5 ? `Final (Top ${finalCutoff})` :
         `Fase ${state.phase + 1}`;
       toast.success('Meja berhasil dibuat', {
         id: 'shuffle',
@@ -162,20 +174,58 @@ export default function ShuffleControl({ state, onShuffle, onPhaseComplete }: Sh
             </DialogTitle>
             <DialogDescription className="text-zinc-400">
               {state.phase === 4
-                ? 'Akan memilih 20 pemain teratas untuk Semifinal (Fase 5).'
+                ? `Akan memilih ${semifinalCutoff} pemain teratas untuk Semifinal (Fase 5).`
                 : state.phase === 5
-                ? 'Akan memilih 10 pemain teratas untuk Final (Fase 6).'
+                ? `Akan memilih ${finalCutoff} pemain teratas untuk Final (Fase 6).`
                 : `Akan men-shuffle meja untuk Fase ${state.phase + 1}.`}
             </DialogDescription>
           </DialogHeader>
+
+          {state.phase === 4 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-zinc-300">Semifinal cutoff</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[10, 20].map((cutoff) => (
+                  <Button
+                    key={cutoff}
+                    type="button"
+                    variant={semifinalCutoff === cutoff ? 'default' : 'outline'}
+                    onClick={() => onSemifinalCutoffChange(cutoff as 10 | 20)}
+                    className={semifinalCutoff === cutoff ? 'bg-blue-600 hover:bg-blue-500' : 'border-white/20 text-white hover:bg-white/10'}
+                  >
+                    Top {cutoff}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {state.phase === 5 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-zinc-300">Final cutoff</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[5, 10].map((cutoff) => (
+                  <Button
+                    key={cutoff}
+                    type="button"
+                    variant={finalCutoff === cutoff ? 'default' : 'outline'}
+                    onClick={() => onFinalCutoffChange(cutoff as 5 | 10)}
+                    className={finalCutoff === cutoff ? 'bg-blue-600 hover:bg-blue-500' : 'border-white/20 text-white hover:bg-white/10'}
+                  >
+                    Top {cutoff}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 my-4">
             <p className="text-sm text-yellow-400">
               <strong>Peringatan:</strong>{' '}
               {state.phase === 4
-                ? 'Pemain di luar Top 20 akan dieliminasi.'
+                ? `Pemain di luar Top ${semifinalCutoff} akan dieliminasi.`
                 : state.phase === 5
-                ? 'Pemain di luar Top 10 akan dieliminasi.'
+                ? `Pemain di luar Top ${finalCutoff} akan dieliminasi.`
                 : 'Semua penugasan meja saat ini akan diganti.'}
             </p>
           </div>

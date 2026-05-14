@@ -25,7 +25,6 @@ import { Table, Player } from '../components/types';
 import {
   generateTables as engineGenerateTables,
   updateOpponents,
-  generateFinalTables,
   Participant as EngineParticipant,
 } from '@/lib/shuffle-engine';
 
@@ -93,6 +92,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const [phaseScores, setPhaseScores] = useState<Record<string, Record<number, number>>>({});
+  const [semifinalCutoff, setSemifinalCutoff] = useState<10 | 20>(20);
+  const [finalCutoff, setFinalCutoff] = useState<5 | 10>(10);
   // Tracks whether the initial DB load has been applied.
   // The sync useEffect must not fire for that first setParticipants call —
   // the DB already has correct state; syncing would unnecessarily overwrite tables.
@@ -161,20 +162,20 @@ export default function AdminPage() {
   const handleShuffle = useCallback(async () => {
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    // Phase 5 → Final (top 10, snake draft into 2 tables)
+    // Phase 5 → Final (top 5 or 10, using the same pairing constraints)
     if (tournamentState.phase === 5) {
       const sorted = [...participants]
         .filter((p) => p.status === 'active')
         .sort((a, b) => b.score - a.score);
 
-      const topTen = sorted.slice(0, 10);
+      const finalists = sorted.slice(0, finalCutoff);
 
-      if (topTen.length < 10) {
-        toast.error('Butuh minimal 10 pemain aktif untuk babak final');
+      if (finalists.length < finalCutoff) {
+        toast.error(`Butuh minimal ${finalCutoff} pemain aktif untuk babak final`);
         return;
       }
 
-      const engineParticipants: EngineParticipant[] = topTen.map((p) => ({
+      const engineParticipants: EngineParticipant[] = finalists.map((p) => ({
         id: p.id,
         name: p.name,
         team: p.team,
@@ -182,15 +183,29 @@ export default function AdminPage() {
         opponents: new Set(p.opponents ?? []),
       }));
 
-      const { tableA, tableB } = generateFinalTables(engineParticipants);
+      const shuffleResult = engineGenerateTables(engineParticipants);
+      const tableGroups = shuffleResult.tables;
+      updateOpponents(tableGroups);
 
       const tableNumberMap = new Map<string, number>();
-      tableA.forEach((p) => tableNumberMap.set(p.id, 1));
-      tableB.forEach((p) => tableNumberMap.set(p.id, 2));
+      const opponentsMap = new Map<string, string[]>();
+      tableGroups.forEach((group, i) => {
+        group.forEach((p) => {
+          tableNumberMap.set(p.id, i + 1);
+          opponentsMap.set(p.id, Array.from(p.opponents));
+        });
+      });
 
       const updated = participants.map((p) => {
         const tableNum = tableNumberMap.get(p.id);
-        if (tableNum) return { ...p, tableNumber: tableNum, eliminatedAtPhase: undefined };
+        if (tableNum) {
+          return {
+            ...p,
+            tableNumber: tableNum,
+            opponents: opponentsMap.get(p.id) ?? p.opponents,
+            eliminatedAtPhase: undefined,
+          };
+        }
         if (p.status === 'active') return { ...p, status: 'eliminated' as const, tableNumber: undefined, eliminatedAtPhase: 5 };
         return p;
       });
@@ -199,27 +214,27 @@ export default function AdminPage() {
       setTournamentState((prev) => ({
         ...prev,
         isFinalPhase: true,
-        totalTables: 2,
-        finalTableA: [1, 3, 5, 7, 9],
-        finalTableB: [2, 4, 6, 8, 10],
+        totalTables: Math.ceil(finalCutoff / 5),
+        finalTableA: undefined,
+        finalTableB: undefined,
       }));
       return;
     }
 
-    // Phase 4 → Semifinal (top 20, 4 tables)
+    // Phase 4 → Semifinal (top 10 or 20)
     if (tournamentState.phase === 4) {
       const sorted = [...participants]
         .filter((p) => p.status === 'active')
         .sort((a, b) => b.score - a.score);
 
-      const topTwenty = sorted.slice(0, 20);
+      const semifinalists = sorted.slice(0, semifinalCutoff);
 
-      if (topTwenty.length < 5) {
-        toast.error('Tidak cukup pemain aktif untuk babak semifinal');
+      if (semifinalists.length < semifinalCutoff) {
+        toast.error(`Butuh minimal ${semifinalCutoff} pemain aktif untuk babak semifinal`);
         return;
       }
 
-      const engineParticipants: EngineParticipant[] = topTwenty.map((p) => ({
+      const engineParticipants: EngineParticipant[] = semifinalists.map((p) => ({
         id: p.id,
         name: p.name,
         team: p.team,
@@ -316,7 +331,7 @@ export default function AdminPage() {
     });
 
     setParticipants(updated);
-  }, [participants, tournamentState.phase]);
+  }, [finalCutoff, participants, semifinalCutoff, tournamentState.phase]);
 
   // Complete phase and advance
   const handlePhaseComplete = useCallback(() => {
@@ -636,9 +651,17 @@ export default function AdminPage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Left Column - Controls */}
               <div className="lg:col-span-4 space-y-6">
-                <PhaseStatus state={tournamentState} />
+                <PhaseStatus
+                  state={tournamentState}
+                  semifinalCutoff={semifinalCutoff}
+                  finalCutoff={finalCutoff}
+                />
                 <ShuffleControl
                   state={tournamentState}
+                  semifinalCutoff={semifinalCutoff}
+                  finalCutoff={finalCutoff}
+                  onSemifinalCutoffChange={setSemifinalCutoff}
+                  onFinalCutoffChange={setFinalCutoff}
                   onShuffle={handleShuffle}
                   onPhaseComplete={handlePhaseComplete}
                 />
