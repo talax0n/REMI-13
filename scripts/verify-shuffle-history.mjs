@@ -128,4 +128,25 @@ assert.equal(
   'dummy placeholders should not accumulate opponent history'
 );
 
+const autoPaddedRound = generateTables(
+  Array.from({ length: 6 }, (_, index) => ({
+    id: `auto-real-${index}`,
+    name: `Auto Real ${index + 1}`,
+    team: `Auto Team ${index}`,
+    score: 0,
+    opponents: new Set(),
+  })),
+  { seed: 13, runs: 2, maxIter: 1000 }
+);
+assert.deepEqual(
+  autoPaddedRound.tables.map((table) => table.length),
+  [5, 5],
+  'shuffle engine should pad non-multiple player counts to full five-seat tables'
+);
+assert.equal(
+  autoPaddedRound.tables.flat().filter((player) => player.isDummy).length,
+  4,
+  'shuffle engine should create exactly enough dummy seats to complete all tables'
+);
+
 console.log('shuffle-history verification passed');

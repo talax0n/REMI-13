@@ -383,12 +383,26 @@ export function generateTables(
   const { runs = 6, maxIter = 20_000, seed } = options;
 
   const rng = seed !== undefined ? mulberry32(seed) : Math.random;
-  const N = participants.length;
+  const paddedParticipants = [...participants];
+  const remainder = paddedParticipants.length % TABLE_SIZE;
+  const dummyCount = remainder === 0 ? 0 : TABLE_SIZE - remainder;
+  for (let i = 0; i < dummyCount; i += 1) {
+    paddedParticipants.push({
+      id: `dummy-${paddedParticipants.length + 1}-${i + 1}`,
+      name: `Dummy ${i + 1}`,
+      team: `__dummy_${i + 1}`,
+      score: 0,
+      opponents: new Set(),
+      isDummy: true,
+    });
+  }
+
+  const N = paddedParticipants.length;
   const numFull = Math.floor(N / TABLE_SIZE);
   const hasRemainder = N % TABLE_SIZE !== 0;
   const totalTables = numFull + (hasRemainder ? 1 : 0);
 
-  const overflow = analyseTeamOverflow(participants, Math.max(numFull, 1));
+  const overflow = analyseTeamOverflow(paddedParticipants, Math.max(numFull, 1));
 
   let bestTables: Participant[][] | null = null;
   let bestRepeats = Infinity;
@@ -397,7 +411,7 @@ export function generateTables(
 
   for (let run = 0; run < runs; run++) {
     // Phase 1: team-optimal seeding (provably minimum concentration)
-    const allTables = perTeamSeed(participants, totalTables, rng);
+    const allTables = perTeamSeed(paddedParticipants, totalTables, rng);
 
     // Partial table (if any) sits outside the full-table optimisation
     const fullTables = hasRemainder ? allTables.slice(0, numFull) : allTables;
