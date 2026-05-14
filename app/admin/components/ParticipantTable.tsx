@@ -178,6 +178,11 @@ export default function ParticipantTable({
   const allVisibleSelected = visibleSelectableIds.length > 0
     && visibleSelectableIds.every((id) => selectedIds.has(id));
   const someVisibleSelected = visibleSelectableIds.some((id) => selectedIds.has(id));
+  const allFilteredSelected = filteredParticipants.length > 0
+    && filteredParticipants.every((participant) => selectedIds.has(participant.id));
+  const canSelectAllFiltered = allVisibleSelected
+    && filteredParticipants.length > visibleSelectableIds.length
+    && !allFilteredSelected;
 
   useEffect(() => {
     setSelectedIds((prev) => {
@@ -203,6 +208,14 @@ export default function ParticipantTable({
         if (selected) next.add(id);
         else next.delete(id);
       });
+      return next;
+    });
+  };
+
+  const selectAllFiltered = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      filteredParticipants.forEach((participant) => next.add(participant.id));
       return next;
     });
   };
@@ -386,6 +399,42 @@ export default function ParticipantTable({
                   Clear
                 </Button>
               </div>
+            </div>
+          )}
+
+          {(canSelectAllFiltered || allFilteredSelected) && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-white/10 bg-zinc-800/40 px-3 py-2 text-sm">
+              {canSelectAllFiltered ? (
+                <>
+                  <span className="text-zinc-300">
+                    All {visibleSelectableIds.length} on this page selected.
+                  </span>
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    onClick={selectAllFiltered}
+                    className="text-cyan-400 hover:text-cyan-300 px-0 self-start sm:self-auto"
+                  >
+                    Select all {filteredParticipants.length} matching participants
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <span className="text-zinc-300">
+                    All {filteredParticipants.length} matching participants selected.
+                  </span>
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    onClick={() => setSelectedIds(new Set())}
+                    className="text-cyan-400 hover:text-cyan-300 px-0 self-start sm:self-auto"
+                  >
+                    Clear selection
+                  </Button>
+                </>
+              )}
             </div>
           )}
 
