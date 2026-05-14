@@ -1,7 +1,8 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { Trophy, TrendingUp, TrendingDown, Medal, Award, XCircle } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Trophy, TrendingUp, TrendingDown, Medal, Award, XCircle, Search, X } from 'lucide-react';
 import { Player } from './types';
 import { getTeamColor } from './team-style';
 
@@ -122,7 +123,7 @@ function PlayerRow({ player, index }: { player: Player; index: number }) {
       transition={{ duration: 0.15, delay: Math.min(index * 0.005, 0.5) }}
       className="flex items-center gap-2 px-2 py-1.5 sm:py-2 hover:bg-white/[0.03] transition-colors border-b border-white/[0.03]"
     >
-      <div className="w-6 h-6 sm:w-8 sm:h-8 rounded flex items-center justify-center text-xs sm:text-sm font-bold text-zinc-500">
+      <div className="w-6 h-6 sm:w-8 sm:h-8 shrink-0 rounded flex items-center justify-center text-xs sm:text-sm font-bold text-zinc-500">
         {player.rank}
       </div>
 
@@ -131,24 +132,23 @@ function PlayerRow({ player, index }: { player: Player; index: number }) {
           <span className="font-medium text-zinc-300 text-sm sm:text-base truncate">{player.name}</span>
           <RankChange current={player.rank} previous={player.previousRank} />
         </div>
+        <span className={`text-[10px] sm:text-xs ${teamStyle.text} truncate block`}>
+          {player.team}
+        </span>
       </div>
 
-      <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded ${teamStyle.bg} ${teamStyle.text} whitespace-nowrap`}>
-        {player.team}
-      </span>
-
-      <div className="w-10 text-center">
-        <span className="text-xs text-zinc-500 tabular-nums">{tableLabel}</span>
+      <div className="w-8 sm:w-10 shrink-0 text-center">
+        <span className="text-[11px] sm:text-xs text-zinc-500 tabular-nums">{tableLabel}</span>
       </div>
 
-      <div className="w-12 sm:w-14 text-right">
-        <span className="text-xs text-emerald-400 tabular-nums">
+      <div className="w-12 sm:w-14 shrink-0 text-right">
+        <span className="text-[11px] sm:text-xs text-emerald-400 tabular-nums">
           +{(player.currentPhaseScore ?? 0).toLocaleString()}
         </span>
       </div>
 
-      <div className="w-14 sm:w-16 text-right">
-        <span className="font-semibold text-zinc-300 text-sm sm:text-base tabular-nums">
+      <div className="w-12 sm:w-16 shrink-0 text-right">
+        <span className="font-semibold text-zinc-300 text-xs sm:text-base tabular-nums">
           {player.score.toLocaleString()}
         </span>
       </div>
@@ -209,7 +209,7 @@ function Phase5Layout({ active, eliminated }: { active: Player[]; eliminated: Pl
   ];
 
   return (
-    <div className="flex-1 flex flex-col gap-3 overflow-hidden min-h-0">
+    <div className="flex-1 flex flex-col gap-3 sm:overflow-hidden min-h-0">
       {/* Active semifinalists */}
       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 shrink-0">
         {/* Top 10 */}
@@ -237,7 +237,7 @@ function Phase5Layout({ active, eliminated }: { active: Player[]; eliminated: Pl
 
       {/* Eliminated */}
       {eliminated.length > 0 && (
-        <div className="flex flex-col overflow-hidden min-h-0">
+        <div className="flex flex-col sm:overflow-hidden min-h-0">
           <div className="flex items-center gap-2 mb-2 shrink-0">
             <XCircle className="w-3 h-3 text-rose-600" />
             <h2 className="text-xs font-medium text-rose-700 uppercase tracking-wider">
@@ -246,7 +246,7 @@ function Phase5Layout({ active, eliminated }: { active: Player[]; eliminated: Pl
           </div>
 
           {/* Mobile */}
-          <div className="sm:hidden overflow-y-auto flex-1 min-h-0 pb-2">
+          <div className="sm:hidden pb-2">
             {eliminated.map((player, index) => (
               <EliminatedRow key={player.id} player={player} index={index} />
             ))}
@@ -278,7 +278,7 @@ function Phase6Layout({ active, eliminated }: { active: Player[]; eliminated: Pl
   ];
 
   return (
-    <div className="flex-1 flex flex-col gap-3 overflow-hidden min-h-0">
+    <div className="flex-1 flex flex-col gap-3 sm:overflow-hidden min-h-0">
       {/* Finalists */}
       <div className="w-full sm:w-96 mx-auto flex flex-col gap-2 shrink-0">
         <h2 className="text-xs font-medium text-yellow-500 uppercase tracking-wider mb-1">
@@ -293,7 +293,7 @@ function Phase6Layout({ active, eliminated }: { active: Player[]; eliminated: Pl
 
       {/* Eliminated */}
       {eliminated.length > 0 && (
-        <div className="flex flex-col overflow-hidden min-h-0">
+        <div className="flex flex-col sm:overflow-hidden min-h-0">
           <div className="flex items-center gap-2 mb-2 shrink-0">
             <XCircle className="w-3 h-3 text-rose-600" />
             <h2 className="text-xs font-medium text-rose-700 uppercase tracking-wider">
@@ -302,7 +302,7 @@ function Phase6Layout({ active, eliminated }: { active: Player[]; eliminated: Pl
           </div>
 
           {/* Mobile */}
-          <div className="sm:hidden overflow-y-auto flex-1 min-h-0 pb-2">
+          <div className="sm:hidden pb-2">
             {eliminated.map((player, index) => (
               <EliminatedRow key={player.id} player={player} index={index} />
             ))}
@@ -335,11 +335,11 @@ function DefaultLayout({ players }: { players: Player[] }) {
   const col3 = rest.slice(colSize * 2);
 
   return (
-    <div className="flex-1 flex flex-col sm:flex-row gap-3 sm:gap-4 overflow-hidden">
+    <div className="flex-1 flex flex-col sm:flex-row gap-3 sm:gap-4 sm:overflow-hidden">
       {/* Top 10 */}
       <div className="w-full sm:w-72 flex flex-col gap-2 shrink-0">
         <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1 shrink-0">Top 10</h2>
-        <div className="overflow-y-auto pr-1 space-y-1 sm:space-y2">
+        <div className="sm:overflow-y-auto pr-1 space-y-1 sm:space-y2">
           {topTen.map((player, index) => (
             <TopTenPlayer key={player.id} player={player} index={index} />
           ))}
@@ -347,19 +347,20 @@ function DefaultLayout({ players }: { players: Player[] }) {
       </div>
 
       {/* Rankings 11+ */}
-      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+      <div className="flex-1 flex flex-col sm:overflow-hidden min-h-0">
         <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2 shrink-0">
           Rankings 11-{players.length}
         </h2>
 
         {/* Mobile */}
-        <div className="sm:hidden overflow-y-auto flex-1 min-h-0">
+        <div className="sm:hidden">
           {rest.length > 0 && (
-            <div className="grid grid-cols-[1fr_2.5rem_3.5rem_4rem] gap-2 px-2 pb-1 text-[10px] uppercase tracking-wider text-zinc-600">
-              <span>Peserta</span>
-              <span className="text-center">Meja</span>
-              <span className="text-right">Babak</span>
-              <span className="text-right">Total</span>
+            <div className="flex items-center gap-2 px-2 pb-1 text-[10px] uppercase tracking-wider text-zinc-600">
+              <span className="w-6 shrink-0" />
+              <span className="flex-1 min-w-0">Peserta</span>
+              <span className="w-8 shrink-0 text-center">Meja</span>
+              <span className="w-12 shrink-0 text-right">Babak</span>
+              <span className="w-12 shrink-0 text-right">Total</span>
             </div>
           )}
           <div className="space-y-0 pb-4">
@@ -407,6 +408,8 @@ function DefaultLayout({ players }: { players: Player[] }) {
 
 export default function LeaderboardScreen({ players, currentPhase = 1 }: LeaderboardScreenProps) {
   const isLatePhase = currentPhase >= 5;
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
 
   const activePlayers = isLatePhase
     ? players.filter((player) => player.status === 'active' || player.status === 'winner')
@@ -422,40 +425,125 @@ export default function LeaderboardScreen({ players, currentPhase = 1 }: Leaderb
         ? 'Final'
         : `Fase ${currentPhase}`;
 
+  const trimmed = query.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    if (!trimmed) return [];
+    return players.filter(
+      (p) =>
+        p.name.toLowerCase().includes(trimmed) ||
+        p.team.toLowerCase().includes(trimmed),
+    );
+  }, [players, trimmed]);
+
   return (
-    <div className="h-full flex flex-col p-2 sm:p-4 bg-[#0a0a0b] overflow-hidden">
+    <div className="flex flex-col p-2 sm:p-4 bg-[#0a0a0b] sm:h-full sm:overflow-hidden">
       {/* Header */}
-      <header className="flex items-center justify-between mb-3 pb-2 border-b border-white/10 shrink-0">
-        <div className="flex items-center gap-2">
-          <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
-          <h1 className="text-lg sm:text-xl font-bold text-white">Leaderboard</h1>
-          <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded-full">{phaseLabel}</span>
+      <header className="flex flex-wrap items-center justify-between gap-y-1 gap-x-3 mb-3 pb-2 border-b border-white/10 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500 shrink-0" />
+          <h1 className="text-base sm:text-xl font-bold text-white">Leaderboard</h1>
+          <span className="text-[10px] sm:text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded-full whitespace-nowrap">{phaseLabel}</span>
         </div>
-        <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+        <div className="flex items-center gap-2 sm:gap-4 text-[11px] sm:text-sm">
           {isLatePhase ? (
-            <span className="text-zinc-500">
+            <span className="text-zinc-500 whitespace-nowrap">
               {activePlayers.length} aktif
               {eliminatedPlayers.length > 0 && (
                 <span className="text-rose-700 ml-2">{eliminatedPlayers.length} gugur</span>
               )}
             </span>
           ) : (
-            <span className="text-zinc-500">{players.length} Players</span>
+            <span className="text-zinc-500 whitespace-nowrap">{players.length} Players</span>
           )}
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1 whitespace-nowrap">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-emerald-400">Live</span>
           </span>
+          <button
+            onClick={() => {
+              setSearchOpen((v) => !v);
+              if (searchOpen) setQuery('');
+            }}
+            aria-label={searchOpen ? 'Close search' : 'Search players'}
+            className={`sm:hidden inline-flex items-center justify-center w-8 h-8 rounded-full border transition-colors ${
+              searchOpen
+                ? 'bg-white/10 border-white/20 text-white'
+                : 'bg-zinc-800/80 border-white/10 text-zinc-300 hover:text-white hover:bg-zinc-700'
+            }`}
+          >
+            {searchOpen ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+          </button>
         </div>
       </header>
 
-      {currentPhase === 5 ? (
-        <Phase5Layout active={activePlayers} eliminated={eliminatedPlayers} />
-      ) : currentPhase === 6 ? (
-        <Phase6Layout active={activePlayers} eliminated={eliminatedPlayers} />
-      ) : (
-        <DefaultLayout players={players} />
+      {/* Mobile search input */}
+      <AnimatePresence initial={false}>
+        {searchOpen && (
+          <motion.div
+            key="search"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="sm:hidden overflow-hidden shrink-0"
+          >
+            <div className="relative mb-3">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
+                <Search className="w-4 h-4 text-zinc-400" />
+              </span>
+              <input
+                autoFocus
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search name or team"
+                className="block w-full h-11 bg-zinc-900 border border-white/10 rounded-full text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 transition"
+                style={{ paddingLeft: '2.5rem', paddingRight: query ? '2.5rem' : '1rem' }}
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  aria-label="Clear search"
+                  className="absolute inset-y-0 right-0 flex items-center pr-2"
+                >
+                  <span className="inline-flex w-6 h-6 items-center justify-center rounded-full bg-zinc-800 text-zinc-400 hover:text-white">
+                    <X className="w-3.5 h-3.5" />
+                  </span>
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile filtered view */}
+      {trimmed && (
+        <div className="sm:hidden">
+          <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">
+            {filtered.length} result{filtered.length === 1 ? '' : 's'}
+          </h2>
+          {filtered.length === 0 ? (
+            <p className="text-sm text-zinc-600 px-2 py-6 text-center">No players match &quot;{query}&quot;.</p>
+          ) : (
+            <div className="space-y-0">
+              {filtered.map((player, index) => (
+                <PlayerRow key={player.id} player={player} index={index} />
+              ))}
+            </div>
+          )}
+        </div>
       )}
+
+      {/* Normal layout (desktop always; mobile when no query) */}
+      <div className={`${trimmed ? 'hidden sm:flex' : 'flex'} flex-1 flex-col min-h-0 sm:overflow-hidden`}>
+        {currentPhase === 5 ? (
+          <Phase5Layout active={activePlayers} eliminated={eliminatedPlayers} />
+        ) : currentPhase === 6 ? (
+          <Phase6Layout active={activePlayers} eliminated={eliminatedPlayers} />
+        ) : (
+          <DefaultLayout players={players} />
+        )}
+      </div>
     </div>
   );
 }

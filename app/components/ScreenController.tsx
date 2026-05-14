@@ -109,14 +109,25 @@ export default function ScreenController() {
   ];
 
   return (
-    <div className="h-screen flex flex-col bg-[#0a0a0b]">
-      {/* Navigation Bar */}
-      <nav className="h-16 flex items-center justify-between px-6 border-b border-white/5 bg-[#0a0a0b]">
+    <div className="h-dvh flex flex-col bg-[#0a0a0b] relative">
+      {/* Mobile top bar — centered logo + name */}
+      <header className="sm:hidden h-14 flex items-center justify-center gap-2 px-4 border-b border-white/5 bg-[#0a0a0b] shrink-0">
+        <img src="/LOGO.png" alt="Remi 13 Logo" className="w-7 h-7 rounded-lg object-contain shrink-0" />
+        <span
+          className="text-base font-bold text-white"
+          style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
+        >
+          Remi 13
+        </span>
+      </header>
+
+      {/* Desktop nav bar */}
+      <nav className="hidden sm:flex h-16 items-center justify-between px-6 gap-2 border-b border-white/5 bg-[#0a0a0b] shrink-0">
         {/* Logo */}
-        <div className="flex items-center gap-3">
-          <img src="/LOGO.png" alt="Remi 13 Logo" className="w-8 h-8 rounded-lg object-contain" />
+        <div className="flex items-center gap-3 min-w-0">
+          <img src="/LOGO.png" alt="Remi 13 Logo" className="w-8 h-8 rounded-lg object-contain shrink-0" />
           <span
-            className="text-lg font-bold text-white"
+            className="text-lg font-bold text-white truncate"
             style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
           >
             Remi 13
@@ -124,15 +135,15 @@ export default function ScreenController() {
         </div>
 
         {/* Nav Items */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentScreen === item.id;
-
             return (
               <button
                 key={item.id}
                 onClick={() => setCurrentScreen(item.id)}
+                aria-label={item.label}
                 className={`
                   flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
                   ${
@@ -143,7 +154,7 @@ export default function ScreenController() {
                 `}
               >
                 <Icon className="w-4 h-4" />
-                {item.label}
+                <span>{item.label}</span>
               </button>
             );
           })}
@@ -152,24 +163,25 @@ export default function ScreenController() {
         {/* Fullscreen Toggle */}
         <button
           onClick={toggleFullscreen}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5 transition-colors text-sm"
+          aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5 transition-colors text-sm shrink-0"
         >
           {isFullscreen ? (
             <>
               <Minimize2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Exit</span>
+              <span>Exit</span>
             </>
           ) : (
             <>
               <Maximize2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Fullscreen</span>
+              <span>Fullscreen</span>
             </>
           )}
         </button>
       </nav>
 
       {/* Screen Content */}
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-y-auto sm:overflow-hidden pb-24 sm:pb-0">
         <AnimatePresence mode="wait">
           {currentScreen === "leaderboard" && (
             <motion.div
@@ -178,7 +190,7 @@ export default function ScreenController() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="h-full"
+              className="min-h-full sm:h-full"
             >
               <LeaderboardScreen players={players} currentPhase={currentPhase} />
             </motion.div>
@@ -190,13 +202,44 @@ export default function ScreenController() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="h-full"
+              className="min-h-full sm:h-full"
             >
               <TablesScreen tables={displayTables} />
             </motion.div>
           )}
         </AnimatePresence>
       </main>
+
+      {/* Mobile floating bottom nav */}
+      <div
+        className="sm:hidden fixed inset-x-0 z-50 px-4 pointer-events-none"
+        style={{ bottom: `max(0.75rem, env(safe-area-inset-bottom))` }}
+      >
+        <div className="mx-auto w-fit pointer-events-auto flex items-center gap-1 p-1 rounded-full bg-zinc-900/90 backdrop-blur border border-white/10 shadow-lg shadow-black/40">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = currentScreen === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setCurrentScreen(item.id)}
+                aria-label={item.label}
+                className={`
+                  flex items-center gap-2 h-10 px-4 rounded-full text-sm font-medium transition-all
+                  ${
+                    isActive
+                      ? "bg-white text-black"
+                      : "text-zinc-300 hover:text-white active:bg-white/10"
+                  }
+                `}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

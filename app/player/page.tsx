@@ -35,75 +35,74 @@ function getRankIcon(rank: number) {
 
 
 // Login Form Component
-function LoginForm({ 
-  onSubmit, 
-  loading, 
-  teams,
-  availableParticipants
-}: { 
-  onSubmit: (data: LoginFormData) => void; 
+function LoginForm({
+  onSubmit,
+  loading,
+  players,
+}: {
+  onSubmit: (data: LoginFormData) => void;
   loading: boolean;
-  teams: string[];
-  availableParticipants: string[];
+  players: Array<{ name: string; team: string }>;
 }) {
   const [name, setName] = useState('');
-  const [team, setTeam] = useState('');
-  const [errors, setErrors] = useState({ name: false, team: false });
+  const [selected, setSelected] = useState<{ name: string; team: string } | null>(null);
+  const [error, setError] = useState<'empty' | 'notfound' | 'ambiguous' | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [showTeamSuggestions, setShowTeamSuggestions] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const filteredNames = useMemo(() => {
-    if (!name.trim()) return [];
-    return availableParticipants.filter(p =>
-        p.toLowerCase().includes(name.toLowerCase()) && 
-        p.toLowerCase() !== name.toLowerCase()
-      ).slice(0, 5);
-  }, [name, availableParticipants]);
-
-  const filteredTeams = useMemo(() => {
-    if (!team.trim()) return [];
-    return teams.filter(c =>
-        c.toLowerCase().includes(team.toLowerCase()) && 
-        c.toLowerCase() !== team.toLowerCase()
-      ).slice(0, 5);
-  }, [team, teams]);
+  const filteredPlayers = useMemo(() => {
+    const q = name.trim().toLowerCase();
+    if (!q) return [];
+    return players
+      .filter((p) => p.name.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const an = a.name.toLowerCase();
+        const bn = b.name.toLowerCase();
+        const aStarts = an.startsWith(q) ? 0 : 1;
+        const bStarts = bn.startsWith(q) ? 0 : 1;
+        if (aStarts !== bStarts) return aStarts - bStarts;
+        return an.localeCompare(bn);
+      })
+      .slice(0, 8);
+  }, [name, players]);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setName(e.target.value);
-    setShowSuggestions(!!e.target.value.trim());
-    setErrors(prev => ({ ...prev, name: false }));
+    const value = e.target.value;
+    setName(value);
+    setShowSuggestions(!!value.trim());
+    setError(null);
+    if (selected && selected.name.toLowerCase() !== value.trim().toLowerCase()) {
+      setSelected(null);
+    }
   };
 
-  const handleSelectName = (selectedName: string) => {
-    setName(selectedName);
+  const handleSelect = (pick: { name: string; team: string }) => {
+    setSelected(pick);
+    setName(pick.name);
     setShowSuggestions(false);
-  };
-
-  const handleTeamChange = (value: string) => {
-    setTeam(value);
-    setShowTeamSuggestions(!!value.trim());
-    setErrors(prev => ({ ...prev, team: false }));
-  };
-
-  const handleSelectTeam = (selectedTeam: string) => {
-    setTeam(selectedTeam);
-    setShowTeamSuggestions(false);
-    setErrors(prev => ({ ...prev, team: false }));
+    setError(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setShowSuggestions(false);
-    setShowTeamSuggestions(false);
-    const newErrors = {
-      name: !name.trim(),
-      team: !team.trim(),
-    };
-    setErrors(newErrors);
-    
-    if (!newErrors.name && !newErrors.team) {
-      onSubmit({ name, team });
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError('empty');
+      return;
+    }
+    if (selected && selected.name.toLowerCase() === trimmed.toLowerCase()) {
+      onSubmit({ name: selected.name, team: selected.team });
+      return;
+    }
+    const exact = players.filter((p) => p.name.toLowerCase() === trimmed.toLowerCase());
+    if (exact.length === 1) {
+      onSubmit({ name: exact[0].name, team: exact[0].team });
+    } else if (exact.length > 1) {
+      setError('ambiguous');
+      setShowSuggestions(true);
+    } else {
+      setError('notfound');
     }
   };
 
@@ -144,146 +143,83 @@ function LoginForm({
                     type="text"
                     value={name}
                     onChange={handleNameChange}
-                    onFocus={() => name.trim() && filteredNames.length > 0 && setShowSuggestions(true)}
+                    onFocus={() => name.trim() && filteredPlayers.length > 0 && setShowSuggestions(true)}
                     onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     placeholder="Type your name..."
                     autoComplete="off"
                     className={`bg-zinc-800/50 border-white/10 text-white h-12 text-lg pr-10 ${
-                      errors.name ? 'border-red-500/50 focus:border-red-500' : ''
+                      error ? 'border-red-500/50 focus:border-red-500' : ''
                     }`}
                   />
                   <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 pointer-events-none" />
                 </div>
-                
+
+                {/* Selected team chip */}
+                {selected && (
+                  <div className="flex items-center gap-2 text-xs text-zinc-400">
+                    <span>Team:</span>
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium ${getTeamStyle(selected.team).bg} ${getTeamStyle(selected.team).text}`}
+                    >
+                      <Hash className="w-3 h-3" />
+                      {selected.team}
+                    </span>
+                  </div>
+                )}
+
                 {/* Search Suggestions */}
                 <AnimatePresence>
-                  {showSuggestions && filteredNames.length > 0 && (
+                  {showSuggestions && filteredPlayers.length > 0 && (
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="absolute z-50 left-0 right-0 top-full mt-1 bg-zinc-800 border border-white/10 rounded-lg shadow-xl overflow-y-auto max-h-[40vh]"
+                      className="absolute z-50 left-0 right-0 top-full mt-1 bg-zinc-800 border border-white/10 rounded-lg shadow-xl overflow-y-auto max-h-[50vh]"
                     >
-                      {filteredNames.map((suggestion, index) => (
-                        <button
-                          key={suggestion}
-                          type="button"
-                          onClick={() => handleSelectName(suggestion)}
-                          onMouseDown={(e) => e.preventDefault()}
-                          className={`
-                            w-full px-4 py-3 text-left text-white text-sm
-                            hover:bg-zinc-700/50 active:bg-zinc-700 transition-colors flex items-center gap-3
-                            ${index !== filteredNames.length - 1 ? 'border-b border-white/5' : ''}
-                          `}
-                        >
-                          <div className="w-8 h-8 shrink-0 rounded-lg bg-zinc-700 flex items-center justify-center">
-                            <Users className="w-4 h-4 text-zinc-400" />
-                          </div>
-                          <span className="font-medium truncate">{suggestion}</span>
-                        </button>
-                      ))}
+                      {filteredPlayers.map((p, index) => {
+                        const ts = getTeamStyle(p.team);
+                        return (
+                          <button
+                            key={`${p.name}__${p.team}`}
+                            type="button"
+                            onClick={() => handleSelect(p)}
+                            onMouseDown={(e) => e.preventDefault()}
+                            className={`
+                              w-full px-4 py-3 text-left text-white text-sm
+                              hover:bg-zinc-700/50 active:bg-zinc-700 transition-colors flex items-center gap-3
+                              ${index !== filteredPlayers.length - 1 ? 'border-b border-white/5' : ''}
+                            `}
+                          >
+                            <div className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center ${ts.bg}`}>
+                              <Users className={`w-4 h-4 ${ts.text}`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate leading-tight">{p.name}</p>
+                              <p className={`text-[11px] truncate ${ts.text} opacity-90`}>{p.team}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </motion.div>
                   )}
                 </AnimatePresence>
 
-                {errors.name && (
+                {error === 'empty' && (
                   <p className="text-red-400 text-sm flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" />
                     Please enter your name
                   </p>
                 )}
-              </div>
-
-              {/* Team Selection with Search */}
-              <div className="space-y-2 relative">
-                <label className="text-sm font-medium text-zinc-300 flex items-center gap-2">
-                  <Hash className="w-4 h-4 text-zinc-500" />
-                  Your Team
-                </label>
-                
-                {/* Team Input */}
-                <div className="relative">
-                  <Input
-                    type="text"
-                    value={team}
-                    onChange={(e) => handleTeamChange(e.target.value)}
-                    onFocus={() => team.trim() && filteredTeams.length > 0 && setShowTeamSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowTeamSuggestions(false), 200)}
-                    placeholder="Type or select your team..."
-                    autoComplete="off"
-                    className={`bg-zinc-800/50 border-white/10 text-white h-12 text-lg pr-10 ${
-                      errors.team ? 'border-red-500/50 focus:border-red-500' : ''
-                    }`}
-                  />
-                  <Hash className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 pointer-events-none" />
-                </div>
-                
-                {/* Team Search Suggestions */}
-                <AnimatePresence>
-                  {showTeamSuggestions && filteredTeams.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="absolute z-50 left-0 right-0 top-full mt-1 bg-zinc-800 border border-white/10 rounded-lg shadow-xl overflow-y-auto max-h-[40vh]"
-                    >
-                      {filteredTeams.map((suggestion, index) => {
-                        const teamStyle = getTeamStyle(suggestion);
-                        return (
-                          <button
-                            key={suggestion}
-                            type="button"
-                            onClick={() => handleSelectTeam(suggestion)}
-                            onMouseDown={(e) => e.preventDefault()}
-                            className={`
-                              w-full px-4 py-3 text-left text-white text-sm
-                              hover:bg-zinc-700/50 active:bg-zinc-700 transition-colors flex items-center gap-3
-                              ${index !== filteredTeams.length - 1 ? 'border-b border-white/5' : ''}
-                            `}
-                          >
-                            <div className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center ${teamStyle.bg}`}>
-                              <Hash className={`w-4 h-4 ${teamStyle.text}`} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <span className="font-medium truncate block">{suggestion}</span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Quick Select Grid (shows when input is empty) */}
-                {!team && !showTeamSuggestions && (
-                  <div className="pt-2">
-                    <p className="text-xs text-zinc-500 mb-2">Quick select:</p>
-                    <div className="grid grid-cols-2 min-[400px]:grid-cols-3 sm:grid-cols-4 gap-2">
-                      {teams.slice(0, 8).map((teamName) => {
-                        const teamStyle = getTeamStyle(teamName);
-                        return (
-                          <button
-                            key={teamName}
-                            type="button"
-                            onClick={() => handleSelectTeam(teamName)}
-                            className={`
-                              min-h-[44px] px-2 py-2 rounded-lg text-xs font-medium transition-all duration-200 truncate
-                              ${teamStyle.bg} ${teamStyle.text} ${teamStyle.border} border
-                              hover:opacity-80 active:scale-[0.97]
-                            `}
-                          >
-                            {teamName}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                
-                {errors.team && (
+                {error === 'notfound' && (
                   <p className="text-red-400 text-sm flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" />
-                    Please select your team
+                    No player matches that name
+                  </p>
+                )}
+                {error === 'ambiguous' && (
+                  <p className="text-amber-400 text-sm flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    Multiple players found — pick yours from the list
                   </p>
                 )}
               </div>
@@ -463,7 +399,13 @@ function PlayerProfile({
             {Array.from({ length: MAX_PHASES }, (_, i) => i + 1).map((phaseNum, index) => {
               const phaseData = player.scores[phaseNum];
               const isCompleted = !!phaseData;
-              
+              const isCurrent = !isCompleted && player.currentPhase === phaseNum;
+              const tableNum = isCompleted
+                ? phaseData.tableNumber
+                : isCurrent
+                  ? player.currentTable
+                  : undefined;
+
               return (
                 <motion.div
                   key={phaseNum}
@@ -472,9 +414,11 @@ function PlayerProfile({
                   transition={{ delay: 0.1 + index * 0.05 }}
                   className={`
                     relative overflow-hidden rounded-lg border p-3 transition-all duration-200
-                    ${isCompleted 
-                      ? 'bg-zinc-800/30 border-emerald-500/20' 
-                      : 'bg-zinc-900/30 border-white/5'
+                    ${isCompleted
+                      ? 'bg-zinc-800/30 border-emerald-500/20'
+                      : isCurrent
+                        ? 'bg-zinc-800/40 border-amber-500/30'
+                        : 'bg-zinc-900/30 border-white/5'
                     }
                   `}
                 >
@@ -485,7 +429,9 @@ function PlayerProfile({
                         w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-xl flex items-center justify-center text-sm font-bold
                         ${isCompleted
                           ? 'bg-emerald-500 text-white'
-                          : 'bg-zinc-800 text-zinc-500'
+                          : isCurrent
+                            ? 'bg-amber-500 text-amber-950'
+                            : 'bg-zinc-800 text-zinc-500'
                         }
                       `}>
                         {phaseNum}
@@ -493,12 +439,30 @@ function PlayerProfile({
 
                       {/* Phase Info */}
                       <div className="min-w-0">
-                        <p className="font-semibold text-white">Phase {phaseNum}</p>
-                        {isCompleted && phaseData.tableNumber && (
-                          <p className="text-xs text-zinc-400 flex items-center gap-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-white leading-tight">Phase {phaseNum}</p>
+                          {isCurrent && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                              Now playing
+                            </span>
+                          )}
+                        </div>
+                        {tableNum ? (
+                          <span
+                            className={`mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium border ${
+                              isCompleted
+                                ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                                : 'bg-amber-500/10 text-amber-200 border-amber-500/30'
+                            }`}
+                          >
                             <Hash className="w-3 h-3 shrink-0" />
-                            <span className="truncate">Table {phaseData.tableNumber}</span>
-                          </p>
+                            <span className="truncate">Table {tableNum}</span>
+                          </span>
+                        ) : (
+                          !isCompleted && (
+                            <p className="mt-1 text-[11px] text-zinc-500">Table not yet assigned</p>
+                          )
                         )}
                       </div>
                     </div>
@@ -515,9 +479,9 @@ function PlayerProfile({
                           </p>
                         </>
                       ) : (
-                        <div className="flex items-center gap-1.5 text-zinc-500">
+                        <div className={`flex items-center gap-1.5 ${isCurrent ? 'text-amber-300' : 'text-zinc-500'}`}>
                           <Clock className="w-4 h-4" />
-                          <span className="text-sm">Pending</span>
+                          <span className="text-sm">{isCurrent ? 'In progress' : 'Pending'}</span>
                         </div>
                       )}
                     </div>
@@ -526,6 +490,9 @@ function PlayerProfile({
                   {/* Completion indicator */}
                   {isCompleted && (
                     <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-bl-full" />
+                  )}
+                  {isCurrent && (
+                    <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-amber-500/15 to-transparent rounded-bl-full" />
                   )}
                 </motion.div>
               );
@@ -604,8 +571,10 @@ export default function PlayerPage() {
   }, []);
 
   // Derived from live stream — same source as the leaderboard
-  const availableParticipants = allPlayers.map((p) => p.name).sort();
-  const teams = Array.from(new Set(allPlayers.map((p) => p.team))).sort();
+  const playerOptions = useMemo(
+    () => allPlayers.map((p) => ({ name: p.name, team: p.team })),
+    [allPlayers],
+  );
 
   const handleLogin = useCallback(async (data: LoginFormData) => {
     setLoading(true);
@@ -641,8 +610,7 @@ export default function PlayerPage() {
           key="login"
           onSubmit={handleLogin}
           loading={loading}
-          teams={teams}
-          availableParticipants={availableParticipants}
+          players={playerOptions}
         />
       )}
 
