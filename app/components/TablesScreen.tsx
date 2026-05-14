@@ -14,6 +14,11 @@ function getTeamStyle(team: string) {
 }
 
 export default function TablesScreen({ tables }: TablesScreenProps) {
+  const realPlayerCount = tables.reduce(
+    (acc, table) => acc + table.players.filter((player) => !player.isDummy).length,
+    0
+  );
+
   return (
     <div className="h-full flex flex-col p-4 bg-[#0a0a0b]">
       {/* Header */}
@@ -25,7 +30,7 @@ export default function TablesScreen({ tables }: TablesScreenProps) {
         <div className="flex items-center gap-4 text-sm">
           <span className="text-zinc-500">{tables.length} Tables</span>
           <span className="text-zinc-500">
-            {tables.reduce((acc, t) => acc + t.players.length, 0)} Players
+            {realPlayerCount} Players
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
@@ -37,24 +42,28 @@ export default function TablesScreen({ tables }: TablesScreenProps) {
       {/* Tables Grid - Dense Layout */}
       <div className="flex-1 overflow-y-auto">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2">
-          {tables.map((table, index) => (
-            <motion.div
-              key={table.id}
-              layout
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.15, delay: index * 0.01 }}
-              className="bg-zinc-900/50 border border-white/5 rounded-lg overflow-hidden hover:border-white/10 transition-colors"
-            >
-              {/* Table Header */}
-              <div className="flex items-center justify-between px-2 py-1.5 bg-zinc-800/50 border-b border-white/5">
-                <span className="text-sm font-bold text-white">Table {table.number}</span>
-                <span className="text-[10px] text-zinc-500">{table.players.length}</span>
-              </div>
+          {tables.map((table, index) => {
+            const realPlayers = table.players.filter((player) => !player.isDummy);
+            const placeholders = table.players.length - realPlayers.length;
 
-              {/* Players List - Compact */}
-              <div className="p-1">
-                {table.players.map((player, playerIndex) => {
+            return (
+              <motion.div
+                key={table.id}
+                layout
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.15, delay: index * 0.01 }}
+                className="bg-zinc-900/50 border border-white/5 rounded-lg overflow-hidden hover:border-white/10 transition-colors"
+              >
+                {/* Table Header */}
+                <div className="flex items-center justify-between px-2 py-1.5 bg-zinc-800/50 border-b border-white/5">
+                  <span className="text-sm font-bold text-white">Table {table.number}</span>
+                  <span className="text-[10px] text-zinc-500">{realPlayers.length}/5</span>
+                </div>
+
+                {/* Players List - Compact */}
+                <div className="p-1">
+                  {realPlayers.map((player, playerIndex) => {
                   const teamStyle = getTeamStyle(player.team);
 
                   return (
@@ -80,19 +89,20 @@ export default function TablesScreen({ tables }: TablesScreenProps) {
                       </div>
                     </motion.div>
                   );
-                })}
-                {Array.from({ length: Math.max(0, 5 - table.players.length) }).map((_, i) => (
+                  })}
+                {Array.from({ length: placeholders + Math.max(0, 5 - table.players.length) }).map((_, i) => (
                   <div
                     key={`empty-${i}`}
                     className="flex items-center px-1.5 py-1 rounded"
                   >
-                    <span className="text-[10px] text-zinc-700 w-3">{table.players.length + i + 1}</span>
-                    <span className="text-xs text-zinc-700 italic ml-1.5">Empty</span>
+                    <span className="text-[10px] text-zinc-700 w-3">{realPlayers.length + i + 1}</span>
+                    <span className="text-xs text-zinc-700 italic ml-1.5">Empty Seat</span>
                   </div>
                 ))}
               </div>
             </motion.div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
