@@ -27,6 +27,7 @@ import {
   updateOpponents,
   Participant as EngineParticipant,
 } from '@/lib/shuffle-engine';
+import { recordTableOpponentHistory } from '@/lib/opponent-history';
 
 function buildTablesFromParticipants(parts: AdminParticipant[]): Table[] {
   const active = parts.filter((p) => p.status === 'active' && p.tableNumber !== undefined);
@@ -195,10 +196,11 @@ export default function AdminPage() {
   // Shuffle tables
   const handleShuffle = useCallback(async () => {
     await new Promise((resolve) => setTimeout(resolve, 1500));
+    const participantsWithCurrentHistory = recordTableOpponentHistory(participants);
 
     // Phase 5 → Final (top 5 or 10, using the same pairing constraints)
     if (tournamentState.phase === 5) {
-      const sorted = [...participants]
+      const sorted = [...participantsWithCurrentHistory]
         .filter((p) => p.status === 'active')
         .sort((a, b) => b.score - a.score);
 
@@ -229,7 +231,7 @@ export default function AdminPage() {
         });
       });
 
-      const updated = participants.map((p) => {
+      const updated = participantsWithCurrentHistory.map((p) => {
         const tableNum = tableNumberMap.get(p.id);
         if (tableNum) {
           return {
@@ -256,7 +258,7 @@ export default function AdminPage() {
 
     // Phase 4 → Semifinal (top 10 or 20)
     if (tournamentState.phase === 4) {
-      const sorted = [...participants]
+      const sorted = [...participantsWithCurrentHistory]
         .filter((p) => p.status === 'active')
         .sort((a, b) => b.score - a.score);
 
@@ -287,7 +289,7 @@ export default function AdminPage() {
         });
       });
 
-      const updated = participants.map((p) => {
+      const updated = participantsWithCurrentHistory.map((p) => {
         if (p.status !== 'active') return p;
         const tableNum = tableNumberMap.get(p.id);
         if (tableNum !== undefined) {
@@ -307,7 +309,7 @@ export default function AdminPage() {
 
     // Phases 1–3 → regular reshuffle. Unpaid/inactive players stay on the roster
     // but are excluded from pairing.
-    const allActive = participants
+    const allActive = participantsWithCurrentHistory
       .filter((p) => p.status === 'active')
       .sort((a, b) => b.score - a.score);
 
@@ -356,7 +358,7 @@ export default function AdminPage() {
       });
     });
 
-    const updated = participants.map((p) => {
+    const updated = participantsWithCurrentHistory.map((p) => {
       if (p.status !== 'active') return p;
       return {
         ...p,
