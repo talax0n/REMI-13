@@ -2,9 +2,6 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { query, ensureMigrated } from '@/lib/db';
-import { participants as seedParticipants } from '@/app/components/participants';
-import { replaceAllAdminParticipants, syncFromAdminParticipants } from '@/lib/player-store';
-import { recordTableOpponentHistory } from '@/lib/opponent-history';
 import { AdminParticipant } from '@/app/admin/types';
 
 interface PlayerRow {
@@ -24,20 +21,6 @@ interface TournamentStateRow {
   max_phases: number;
 }
 
-function buildSeedAdminParticipants(): AdminParticipant[] {
-  const participants = seedParticipants.map((p, index) => ({
-    id: `participant-${index}`,
-    name: p.name,
-    team: p.team,
-    score: 0,
-    matchesPlayed: 0,
-    status: p.active ? ('active' as const) : ('eliminated' as const),
-    tableNumber: p.tableNumber,
-    opponents: [],
-  }));
-  return recordTableOpponentHistory(participants);
-}
-
 export async function GET() {
   await ensureMigrated();
 
@@ -48,42 +31,16 @@ export async function GET() {
 
   const tournamentState = stateRows[0] ?? { phase: 1, status: 'in_progress', max_phases: 6 };
 
-  let participants: AdminParticipant[];
-
-  if (playerRows.length === 0) {
-    // Seed phase 1 data on first boot and persist to DB
-    participants = buildSeedAdminParticipants();
-
-    // Persist to DB so subsequent loads read from DB directly
-    await syncFromAdminParticipants(
-      participants.map((p) => ({
-        id: p.id,
-        name: p.name,
-        team: p.team,
-        score: p.score,
-        status: p.status,
-        tableNumber: p.tableNumber,
-        opponents: p.opponents,
-        matchesPlayed: p.matchesPlayed,
-      }))
-    );
-
-    // Phase 1 is pre-set with static table assignments; mark as in_progress
-    await query(
-      `UPDATE tournament_state SET phase = 1, status = 'in_progress', max_phases = 6, updated_at = NOW() WHERE id = 1`
-    );
-  } else {
-    participants = playerRows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      team: row.team,
-      score: row.total_score,
-      matchesPlayed: row.matches_played,
-      status: row.status as AdminParticipant['status'],
-      tableNumber: row.current_table ?? undefined,
-      opponents: row.opponents ?? [],
-    }));
-  }
+  const participants: AdminParticipant[] = playerRows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    team: row.team,
+    score: row.total_score,
+    matchesPlayed: row.matches_played,
+    status: row.status as AdminParticipant['status'],
+    tableNumber: row.current_table ?? undefined,
+    opponents: row.opponents ?? [],
+  }));
 
   const activeCount = participants.filter((p) => p.status === 'active').length;
   return Response.json({
@@ -91,8 +48,8 @@ export async function GET() {
     tournamentState: {
       phase: tournamentState.phase,
       status: tournamentState.status,
-      totalParticipants: participants.length,
-      totalTables: Math.floor(activeCount / 5),
+      totalParticipants: activeCount,
+      totalTables: Math.ceil(activeCount / 5),
       maxPhases: tournamentState.max_phases,
       isFinalPhase: tournamentState.phase >= tournamentState.max_phases,
     },
@@ -103,38 +60,24 @@ export async function POST(request: Request) {
   const body = await request.json();
 
   if (body.action === 'resetDatabase') {
-    const participants = buildSeedAdminParticipants();
-
-    await replaceAllAdminParticipants(
-      participants.map((p) => ({
-        id: p.id,
-        name: p.name,
-        team: p.team,
-        score: 0,
-        status: p.status,
-        tableNumber: p.tableNumber,
-        opponents: p.opponents,
-        matchesPlayed: 0,
-      }))
-    );
-
     await Promise.all([
+      query('DELETE FROM players'),
       query('DELETE FROM game_tables'),
       query(
         `UPDATE tournament_state
-         SET phase = 1, status = 'in_progress', max_phases = 6, updated_at = NOW()
+         SET phase = 1, status = 'waiting', max_phases = 6, updated_at = NOW()
          WHERE id = 1`
       ),
     ]);
 
     return Response.json({
       ok: true,
-      participants,
+      participants: [],
       tournamentState: {
         phase: 1,
-        status: 'in_progress',
-        totalParticipants: participants.length,
-        totalTables: Math.floor(participants.filter((p) => p.status === 'active').length / 5),
+        status: 'waiting',
+        totalParticipants: 0,
+        totalTables: 0,
         maxPhases: 6,
         isFinalPhase: false,
       },

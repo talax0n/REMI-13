@@ -5,7 +5,8 @@ export interface Player {
   score: number;
   rank: number;
   previousRank?: number;
-  status?: 'active' | 'eliminated' | 'winner';
+  status?: 'active' | 'eliminated' | 'winner' | 'dummy';
+  isDummy?: boolean;
   currentTable?: number;
 }
 

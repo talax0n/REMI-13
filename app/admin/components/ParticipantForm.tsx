@@ -7,22 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 
 interface ParticipantFormProps {
-  teams: string[];
   onAddParticipant: (name: string, team: string) => Promise<void>;
 }
 
-export default function ParticipantForm({ teams, onAddParticipant }: ParticipantFormProps) {
+export default function ParticipantForm({ onAddParticipant }: ParticipantFormProps) {
   const [name, setName] = useState('');
   const [team, setTeam] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -79,22 +71,13 @@ export default function ParticipantForm({ teams, onAddParticipant }: Participant
 
             <div className="space-y-2">
               <Label htmlFor="team" className="text-zinc-300">Team</Label>
-              <Select value={team} onValueChange={setTeam}>
-                <SelectTrigger className="bg-zinc-800/50 border-white/10 text-white">
-                  <SelectValue placeholder="Select team" />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-white/10">
-                  {teams.map((c) => (
-                    <SelectItem 
-                      key={c} 
-                      value={c}
-                      className="text-white hover:bg-zinc-700"
-                    >
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                id="team"
+                placeholder="Enter team name"
+                value={team}
+                onChange={(e) => setTeam(e.target.value)}
+                className="bg-zinc-800/50 border-white/10 text-white placeholder:text-zinc-500"
+              />
             </div>
 
             <Separator className="bg-white/10" />

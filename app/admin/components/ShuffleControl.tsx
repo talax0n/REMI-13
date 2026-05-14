@@ -27,7 +27,7 @@ export default function ShuffleControl({ state, onShuffle, onPhaseComplete }: Sh
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isShuffling, setIsShuffling] = useState(false);
 
-  const canShuffle = state.phase < state.maxPhases && state.totalParticipants >= 5;
+  const canShuffle = state.phase < state.maxPhases && state.totalParticipants >= 1;
   const isPhaseComplete = state.status === 'completed';
 
   const handleShuffleClick = () => {
@@ -36,9 +36,9 @@ export default function ShuffleControl({ state, onShuffle, onPhaseComplete }: Sh
         toast.error('Turnamen selesai', {
           description: 'Semua fase telah selesai.',
         });
-      } else if (state.totalParticipants < 5) {
+      } else if (state.totalParticipants < 1) {
         toast.error('Peserta tidak cukup', {
-          description: 'Butuh minimal 5 peserta untuk generate meja.',
+          description: 'Butuh minimal 1 peserta aktif untuk generate meja.',
         });
       }
       return;
@@ -106,7 +106,7 @@ export default function ShuffleControl({ state, onShuffle, onPhaseComplete }: Sh
               <AlertDescription>
                 {state.phase >= state.maxPhases 
                   ? 'Tournament is complete. No more phases available.'
-                  : 'Not enough participants to generate tables.'}
+                  : 'No active paid participants to generate tables.'}
               </AlertDescription>
             </Alert>
           )}

@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { Trophy, TrendingUp, TrendingDown, Medal, Award, XCircle } from 'lucide-react';
 import { Player } from './types';
-import { teamColors, defaultTeamColor } from './participants';
+import { getTeamColor } from './team-style';
 
 interface LeaderboardScreenProps {
   players: Player[];
@@ -11,7 +11,7 @@ interface LeaderboardScreenProps {
 }
 
 function getTeamStyle(team: string) {
-  return teamColors[team] || defaultTeamColor;
+  return getTeamColor(team);
 }
 
 function RankChange({ current, previous }: { current: number; previous?: number }) {

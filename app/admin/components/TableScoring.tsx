@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { teamColors, defaultTeamColor } from '../../components/participants';
+import { getTeamColor } from '../../components/team-style';
 import { Table, Player } from '../../components/types';
 import { PlayerScore } from '../../player/types';
 
@@ -18,7 +18,7 @@ interface TableScoringProps {
 }
 
 function getTeamStyle(team: string) {
-  return teamColors[team] || defaultTeamColor;
+  return getTeamColor(team);
 }
 
 export default function TableScoring({ currentPhase = 1, onSaveScores }: TableScoringProps) {
@@ -57,6 +57,7 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
   }, [fetchData]);
 
   const handleScoreChange = (participantId: string, value: string) => {
+    if (participantId.startsWith('dummy-')) return;
     const numValue = parseInt(value) || 0;
     setScores((prev) => ({ ...prev, [participantId]: numValue }));
     setHasChanges(true);
@@ -90,7 +91,7 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
         id,
         score,
         phase: currentPhase,
-      }));
+      })).filter((update) => !update.id.startsWith('dummy-'));
       await onSaveScores(updates);
       toast.success('Scores saved');
       setHasChanges(false);
@@ -174,8 +175,9 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {tables.map((table, index) => {
-            const hasScores = table.players.some((p) => scores[p.id] !== undefined);
-            const scoredCount = table.players.filter((p) => scores[p.id] !== undefined).length;
+            const realPlayers = table.players.filter((p) => !p.isDummy);
+            const hasScores = realPlayers.some((p) => scores[p.id] !== undefined);
+            const scoredCount = realPlayers.filter((p) => scores[p.id] !== undefined).length;
             return (
               <motion.button
                 key={table.number}
@@ -204,11 +206,11 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
                 <div className="space-y-1">
                   <div className="flex items-center gap-1.5 text-sm text-zinc-400">
                     <Users className="w-3.5 h-3.5" />
-                    <span>{table.players.length} players</span>
+                    <span>{realPlayers.length} players</span>
                   </div>
                   {hasScores && (
                     <div className="text-xs text-emerald-400 font-medium">
-                      {scoredCount}/{table.players.length} scored
+                      {scoredCount}/{realPlayers.length} scored
                     </div>
                   )}
                 </div>
@@ -231,7 +233,7 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
           <div className="bg-zinc-900/50 border border-white/10 rounded-xl p-3">
             <p className="text-xs text-zinc-500 uppercase tracking-wider">Active Players</p>
             <p className="text-xl font-bold text-emerald-400">
-              {tables.reduce((s, t) => s + t.players.length, 0)}
+              {tables.reduce((s, t) => s + t.players.filter((p) => !p.isDummy).length, 0)}
             </p>
           </div>
           <div className="bg-zinc-900/50 border border-white/10 rounded-xl p-3">
@@ -296,6 +298,7 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
             const dbScore = playerScores.get(player.id) ?? player.score;
             const hasNewScore = scores[player.id] !== undefined;
             const teamStyle = getTeamStyle(player.team);
+            const isDummy = !!player.isDummy;
 
             return (
               <motion.div
@@ -323,7 +326,7 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
                       <h3 className="font-bold text-white truncate">{player.name}</h3>
                     </div>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${teamStyle.bg} ${teamStyle.text}`}>
-                      {player.team}
+                      {isDummy ? 'Placeholder' : player.team}
                     </span>
                     <div className="mt-2 flex items-center gap-2">
                       <span className="text-xs text-zinc-500">Current:</span>
@@ -345,6 +348,7 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                           handleScoreChange(player.id, e.target.value)
                         }
+                        disabled={isDummy}
                         placeholder="0"
                         className="
                           w-20 h-10 bg-zinc-800/50 border-white/10

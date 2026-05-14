@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { AdminParticipant } from '../types';
-import { teamColors, defaultTeamColor } from '../../components/participants';
+import { getTeamColor } from '../../components/team-style';
 
 interface ParticipantTableProps {
   participants: AdminParticipant[];
@@ -40,7 +40,7 @@ type SortField = 'name' | 'team' | 'score' | 'matchesPlayed' | 'status';
 type SortDirection = 'asc' | 'desc';
 
 function getTeamStyle(team: string) {
-  return teamColors[team] || defaultTeamColor;
+  return getTeamColor(team);
 }
 
 // Stats Card Component

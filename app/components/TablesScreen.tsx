@@ -3,14 +3,14 @@
 import { motion } from 'framer-motion';
 import { Users } from 'lucide-react';
 import { Table } from './types';
-import { teamColors, defaultTeamColor } from './participants';
+import { getTeamColor } from './team-style';
 
 interface TablesScreenProps {
   tables: Table[];
 }
 
 function getTeamStyle(team: string) {
-  return teamColors[team] || defaultTeamColor;
+  return getTeamColor(team);
 }
 
 export default function TablesScreen({ tables }: TablesScreenProps) {

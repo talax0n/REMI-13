@@ -44,6 +44,7 @@ export interface Participant {
   name: string;
   team: string;
   score: number;
+  isDummy?: boolean;
   /** IDs of all participants this player has shared a table with in prior phases. */
   opponents: Set<string>;
 }
@@ -111,18 +112,24 @@ export function fisherYatesShuffle<T>(arr: T[], rng: () => number = Math.random)
 /** Number of same-team pairs within a single table. */
 function teamPairs(table: Participant[]): number {
   let n = 0;
-  for (let i = 0; i < table.length; i++)
-    for (let j = i + 1; j < table.length; j++)
+  for (let i = 0; i < table.length; i++) {
+    for (let j = i + 1; j < table.length; j++) {
+      if (table[i].isDummy || table[j].isDummy) continue;
       if (table[i].team === table[j].team) n++;
+    }
+  }
   return n;
 }
 
 /** Number of prior-opponent pairs within a single table. */
 function repeatPairs(table: Participant[]): number {
   let n = 0;
-  for (let i = 0; i < table.length; i++)
-    for (let j = i + 1; j < table.length; j++)
+  for (let i = 0; i < table.length; i++) {
+    for (let j = i + 1; j < table.length; j++) {
+      if (table[i].isDummy || table[j].isDummy) continue;
       if (table[i].opponents.has(table[j].id)) n++;
+    }
+  }
   return n;
 }
 
@@ -331,8 +338,10 @@ function analyseTeamOverflow(
   numTables: number,
 ): { total: number; details: OverflowDetail[] } {
   const counts = new Map<string, number>();
-  for (const p of participants)
+  for (const p of participants) {
+    if (p.isDummy) continue;
     counts.set(p.team, (counts.get(p.team) ?? 0) + 1);
+  }
 
   let total = 0;
   const details: OverflowDetail[] = [];
@@ -460,8 +469,9 @@ export function generateTables(
 export function updateOpponents(tables: Participant[][]): void {
   for (const table of tables) {
     for (const player of table) {
+      if (player.isDummy) continue;
       for (const opponent of table) {
-        if (opponent.id !== player.id) {
+        if (!opponent.isDummy && opponent.id !== player.id) {
           player.opponents.add(opponent.id);
         }
       }

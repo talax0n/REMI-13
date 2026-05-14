@@ -51,8 +51,21 @@ function buildTablesFromParticipants(parts: AdminParticipant[]): Table[] {
           score: p.score,
           rank: i + 1,
           status: p.status,
-        })),
+        }))
+        .concat(createDummyPlayersForTable(num, players.length)),
     }));
+}
+
+function createDummyPlayersForTable(tableNumber: number, playerCount: number): Player[] {
+  return Array.from({ length: Math.max(0, 5 - playerCount) }, (_, index) => ({
+    id: `dummy-table-${tableNumber}-${index + 1}`,
+    name: `Dummy ${index + 1}`,
+    team: 'Dummy',
+    score: 0,
+    rank: playerCount + index + 1,
+    status: 'dummy',
+    isDummy: true,
+  }));
 }
 
 // Extract unique teams
@@ -109,7 +122,7 @@ export default function AdminPage() {
     const activeParticipants = participants.filter((p) => p.status === 'active');
     setTournamentState((prev) => ({
       ...prev,
-      totalParticipants: participants.length,
+      totalParticipants: activeParticipants.length,
       totalTables: Math.ceil(activeParticipants.length / 5),
     }));
   }, [participants]);
@@ -245,23 +258,31 @@ export default function AdminPage() {
       return;
     }
 
-    // Phases 1–3 → regular reshuffle
-    // Only assign complete tables of 5; lowest-scoring remainder sit out this phase
+    // Phases 1–3 → regular reshuffle. Unpaid/inactive players stay on the roster
+    // but are excluded from pairing.
     const allActive = participants
       .filter((p) => p.status === 'active')
       .sort((a, b) => b.score - a.score);
 
-    const tableCount = Math.floor(allActive.length / 5);
-    const assignable = allActive.slice(0, tableCount * 5);
-    const sittingOut = new Set(allActive.slice(tableCount * 5).map((p) => p.id));
-
-    const engineParticipants: EngineParticipant[] = assignable.map((p) => ({
+    const engineParticipants: EngineParticipant[] = allActive.map((p) => ({
       id: p.id,
       name: p.name,
       team: p.team,
       score: p.score,
       opponents: new Set(p.opponents ?? []),
     }));
+    const realCount = engineParticipants.length;
+    const dummyCount = (5 - (realCount % 5)) % 5;
+    for (let i = 0; i < dummyCount; i++) {
+      engineParticipants.push({
+        id: `dummy-${Date.now()}-${i + 1}`,
+        name: `Dummy ${i + 1}`,
+        team: `__dummy_${i + 1}`,
+        score: 0,
+        opponents: new Set(),
+        isDummy: true,
+      });
+    }
 
     let tableGroups: EngineParticipant[][];
 
@@ -279,6 +300,7 @@ export default function AdminPage() {
     const opponentsMap = new Map<string, string[]>();
     tableGroups.forEach((group, i) => {
       group.forEach((p) => {
+        if (p.isDummy) return;
         tableNumberMap.set(p.id, i + 1);
         opponentsMap.set(p.id, Array.from(p.opponents));
       });
@@ -286,7 +308,6 @@ export default function AdminPage() {
 
     const updated = participants.map((p) => {
       if (p.status !== 'active') return p;
-      if (sittingOut.has(p.id)) return { ...p, tableNumber: undefined };
       return {
         ...p,
         tableNumber: tableNumberMap.get(p.id) ?? p.tableNumber,
@@ -622,7 +643,6 @@ export default function AdminPage() {
                   onPhaseComplete={handlePhaseComplete}
                 />
                 <ParticipantForm
-                  teams={teams}
                   onAddParticipant={handleAddParticipant}
                 />
                 <BulkImportUploader

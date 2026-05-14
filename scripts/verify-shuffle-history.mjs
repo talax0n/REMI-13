@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { participants } from '../app/components/participants.ts';
 import { generateTables, updateOpponents } from '../lib/shuffle-engine.ts';
 import { recordTableOpponentHistory } from '../lib/opponent-history.ts';
 
@@ -18,23 +17,21 @@ function toEngineParticipant(player) {
 }
 
 const seededPhaseOne = recordTableOpponentHistory(
-  participants
-    .filter((participant) => participant.active)
-    .map((participant, index) => ({
-      id: `participant-${index}`,
-      name: participant.name,
-      team: participant.team,
-      score: 0,
-      status: 'active',
-      tableNumber: participant.tableNumber,
-      opponents: [],
-    }))
+  Array.from({ length: 25 }, (_, index) => ({
+    id: `seeded-${index}`,
+    name: `Seeded Player ${index}`,
+    team: `Seeded Team ${index % 5}`,
+    score: 0,
+    status: 'active',
+    tableNumber: Math.floor(index / 5) + 1,
+    opponents: [],
+  }))
 );
 
-assert.equal(seededPhaseOne.length, 100);
+assert.equal(seededPhaseOne.length, 25);
 assert.equal(
   seededPhaseOne.reduce((total, player) => total + (player.opponents?.length ?? 0), 0),
-  400,
+  100,
   'seeded phase-1 tablemates should be recorded before the first reshuffle'
 );
 
@@ -92,6 +89,43 @@ assert.equal(
   totalOpponentEntries(fallbackPlayers),
   40,
   'fallback table groups should also record opponent history'
+);
+
+const dummyPaddedPlayers = [
+  ...Array.from({ length: 6 }, (_, index) => ({
+    id: `real-${index}`,
+    name: `Real ${index}`,
+    team: `Real Team ${index % 6}`,
+    score: 0,
+    opponents: new Set(),
+  })),
+  ...Array.from({ length: 4 }, (_, index) => ({
+    id: `dummy-${index}`,
+    name: `Dummy ${index + 1}`,
+    team: `__dummy_${index}`,
+    score: 0,
+    opponents: new Set(),
+    isDummy: true,
+  })),
+];
+const dummyRound = generateTables(dummyPaddedPlayers, {
+  seed: 4,
+  runs: 4,
+  maxIter: 10_000,
+});
+assert.equal(dummyRound.tables.length, 2);
+assert.deepEqual(
+  dummyRound.tables.map((table) => table.length),
+  [5, 5],
+  'dummy placeholders should allow every generated table to contain exactly five seats'
+);
+updateOpponents(dummyRound.tables);
+assert.equal(
+  dummyPaddedPlayers
+    .filter((player) => player.isDummy)
+    .reduce((total, player) => total + player.opponents.size, 0),
+  0,
+  'dummy placeholders should not accumulate opponent history'
 );
 
 console.log('shuffle-history verification passed');

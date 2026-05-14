@@ -18,12 +18,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { PlayerScore, PlayerView, LoginFormData } from './types';
-import { teamColors, defaultTeamColor } from '../components/participants';
+import { getTeamColor } from '../components/team-style';
 
 const MAX_PHASES = 6;
 
 function getTeamStyle(team: string) {
-  return teamColors[team] || defaultTeamColor;
+  return getTeamColor(team);
 }
 
 function getRankIcon(rank: number) {

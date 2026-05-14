@@ -7,7 +7,6 @@ import LeaderboardScreen from "./LeaderboardScreen";
 import TablesScreen from "./TablesScreen";
 import { ScreenType, Player, Table } from "./types";
 import { PlayerScore } from "../player/types";
-import { participants } from "./participants";
 
 function convertToPlayers(scores: PlayerScore[]): Player[] {
   return scores.map((p, index) => ({
@@ -19,38 +18,6 @@ function convertToPlayers(scores: PlayerScore[]): Player[] {
     status: p.status,
     currentTable: p.currentTable,
   }));
-}
-
-// Phase 1 fallback: build tables directly from static participants.ts data,
-// merging live scores by name lookup.
-function buildPhase1Tables(players: Player[]): Table[] {
-  const scoreByName = new Map<string, number>();
-  for (const p of players) {
-    scoreByName.set(p.name.toUpperCase(), p.score);
-  }
-
-  const tableMap = new Map<number, Player[]>();
-  participants
-    .filter((p) => p.active)
-    .forEach((p, index) => {
-      const tableNum = p.tableNumber ?? 1;
-      if (!tableMap.has(tableNum)) tableMap.set(tableNum, []);
-      tableMap.get(tableNum)!.push({
-        id: `p1-${index}`,
-        name: p.name,
-        team: p.team,
-        score: scoreByName.get(p.name.toUpperCase()) ?? 0,
-        rank: 0,
-      });
-    });
-
-  return Array.from(tableMap.entries())
-    .sort(([a], [b]) => a - b)
-    .map(([num, tablePlayers]) => ({
-      id: `table-p1-${num}`,
-      number: num,
-      players: tablePlayers,
-    }));
 }
 
 export default function ScreenController() {
@@ -111,14 +78,7 @@ export default function ScreenController() {
     return () => es.close();
   }, []);
 
-  // Phase 1: ALWAYS use static participants.ts formation
-  // Phases 2+: use admin-pushed shuffled tables from SSE
-  const displayTables =
-    currentPhase === 1
-      ? buildPhase1Tables(players)
-      : tables.length > 0
-        ? tables
-        : buildPhase1Tables(players);
+  const displayTables = tables;
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {

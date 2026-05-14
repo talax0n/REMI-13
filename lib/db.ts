@@ -6,11 +6,21 @@ declare global {
 }
 
 function createPool(): Pool {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error(
+      'DATABASE_URL is not set. Create .env.local with DATABASE_URL=postgres://user:pass@host:5432/db ' +
+        '(use Neon/Vercel Postgres for prod, or a local Postgres for dev).'
+    );
+  }
   return new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString,
     max: 5,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
+    ssl: /sslmode=require|neon\.tech|vercel-storage\.com|supabase\.co/.test(connectionString)
+      ? { rejectUnauthorized: false }
+      : undefined,
   });
 }
 
@@ -59,7 +69,7 @@ async function runMigration(): Promise<void> {
       );
 
       INSERT INTO tournament_state (id, phase, status, max_phases)
-      VALUES (1, 1, 'completed', 6)
+      VALUES (1, 1, 'waiting', 6)
       ON CONFLICT (id) DO NOTHING;
     `);
 
