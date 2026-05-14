@@ -51,7 +51,7 @@ export default function PlayerQRCode({ isOpen, onClose }: PlayerQRCodeProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-sm w-[90vw] p-4 sm:p-6">
+      <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-sm w-[90vw] p-4 sm:p-6 overflow-x-hidden">
         <DialogHeader className="space-y-2">
           <DialogTitle className="text-lg sm:text-xl font-bold flex items-center gap-2">
             <QrCode className="w-5 h-5 text-emerald-400" />
@@ -88,8 +88,8 @@ export default function PlayerQRCode({ isOpen, onClose }: PlayerQRCodeProps) {
           </div>
 
           {/* URL Display */}
-          <div className="bg-zinc-800/50 rounded-lg p-2.5 sm:p-3 flex items-center gap-2">
-            <code className="flex-1 text-xs sm:text-sm text-zinc-400 truncate">
+          <div className="bg-zinc-800/50 rounded-lg p-2.5 sm:p-3 flex items-center gap-2 min-w-0">
+            <code className="flex-1 min-w-0 text-xs sm:text-sm text-zinc-400 truncate">
               {playerUrl}
             </code>
             <Button
