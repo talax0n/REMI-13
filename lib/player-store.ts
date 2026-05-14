@@ -42,12 +42,16 @@ function rowToPlayerScore(row: PlayerRow): PlayerScore {
 }
 
 export async function getPlayerScores(): Promise<PlayerScore[]> {
-  const rows = await query<PlayerRow>('SELECT * FROM players ORDER BY total_score DESC');
+  const rows = await query<PlayerRow>(
+    'SELECT * FROM players ORDER BY total_score DESC, current_table ASC NULLS LAST, name ASC'
+  );
   return rows.map(rowToPlayerScore);
 }
 
 export async function getLeaderboard(): Promise<PlayerScore[]> {
-  const rows = await query<PlayerRow>('SELECT * FROM players ORDER BY total_score DESC');
+  const rows = await query<PlayerRow>(
+    'SELECT * FROM players ORDER BY total_score DESC, current_table ASC NULLS LAST, name ASC'
+  );
   return rows.map(rowToPlayerScore);
 }
 

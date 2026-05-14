@@ -65,6 +65,7 @@ function RankBadge({ rank }: { rank: number }) {
 
 function TopTenPlayer({ player, index }: { player: Player; index: number }) {
   const teamStyle = getTeamStyle(player.team);
+  const tableLabel = player.currentTable ? `Table ${player.currentTable}` : 'No table';
 
   return (
     <motion.div
@@ -91,10 +92,16 @@ function TopTenPlayer({ player, index }: { player: Player; index: number }) {
           <h3 className="font-bold text-white text-sm sm:text-base truncate">{player.name}</h3>
           <RankChange current={player.rank} previous={player.previousRank} />
         </div>
-        <span className={`text-xs sm:text-sm ${teamStyle.text}`}>{player.team}</span>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className={`text-xs sm:text-sm ${teamStyle.text}`}>{player.team}</span>
+          <span className="text-[10px] sm:text-xs text-zinc-500">{tableLabel}</span>
+        </div>
       </div>
 
-      <div className="text-right">
+      <div className="text-right shrink-0">
+        <div className="text-[10px] sm:text-xs text-emerald-400 tabular-nums">
+          +{(player.currentPhaseScore ?? 0).toLocaleString()}
+        </div>
         <div className={`text-base sm:text-lg font-black tabular-nums ${index < 3 ? 'text-white' : 'text-zinc-300'}`}>
           {player.score.toLocaleString()}
         </div>
@@ -105,6 +112,7 @@ function TopTenPlayer({ player, index }: { player: Player; index: number }) {
 
 function PlayerRow({ player, index }: { player: Player; index: number }) {
   const teamStyle = getTeamStyle(player.team);
+  const tableLabel = player.currentTable ? `T${player.currentTable}` : '-';
 
   return (
     <motion.div
@@ -129,6 +137,16 @@ function PlayerRow({ player, index }: { player: Player; index: number }) {
         {player.team}
       </span>
 
+      <div className="w-10 text-center">
+        <span className="text-xs text-zinc-500 tabular-nums">{tableLabel}</span>
+      </div>
+
+      <div className="w-12 sm:w-14 text-right">
+        <span className="text-xs text-emerald-400 tabular-nums">
+          +{(player.currentPhaseScore ?? 0).toLocaleString()}
+        </span>
+      </div>
+
       <div className="w-14 sm:w-16 text-right">
         <span className="font-semibold text-zinc-300 text-sm sm:text-base tabular-nums">
           {player.score.toLocaleString()}
@@ -140,6 +158,7 @@ function PlayerRow({ player, index }: { player: Player; index: number }) {
 
 function EliminatedRow({ player, index }: { player: Player; index: number }) {
   const teamStyle = getTeamStyle(player.team);
+  const tableLabel = player.currentTable ? `T${player.currentTable}` : '-';
 
   return (
     <motion.div
@@ -162,6 +181,10 @@ function EliminatedRow({ player, index }: { player: Player; index: number }) {
       <span className={`text-[10px] px-1.5 py-0.5 rounded ${teamStyle.bg} ${teamStyle.text} whitespace-nowrap`}>
         {player.team}
       </span>
+
+      <div className="w-8 text-center">
+        <span className="text-[10px] text-zinc-600 tabular-nums">{tableLabel}</span>
+      </div>
 
       <div className="w-14 sm:w-16 text-right">
         <span className="text-zinc-600 text-xs sm:text-sm tabular-nums">
@@ -329,6 +352,14 @@ function DefaultLayout({ players }: { players: Player[] }) {
 
         {/* Mobile */}
         <div className="sm:hidden overflow-y-auto flex-1 min-h-0">
+          {rest.length > 0 && (
+            <div className="grid grid-cols-[1fr_2.5rem_3.5rem_4rem] gap-2 px-2 pb-1 text-[10px] uppercase tracking-wider text-zinc-600">
+              <span>Peserta</span>
+              <span className="text-center">Meja</span>
+              <span className="text-right">Babak</span>
+              <span className="text-right">Total</span>
+            </div>
+          )}
           <div className="space-y-0 pb-4">
             {rest.map((player, index) => (
               <PlayerRow key={player.id} player={player} index={index} />
@@ -342,17 +373,17 @@ function DefaultLayout({ players }: { players: Player[] }) {
             <div key={colIndex} className="overflow-y-auto">
               {colIndex === 0 && (
                 <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2 sticky top-0 bg-[#0a0a0b] py-1">
-                  {11}-{10 + colSize}
+                  {11}-{10 + colSize} · Meja · Babak · Total
                 </h3>
               )}
               {colIndex === 1 && (
                 <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2 sticky top-0 bg-[#0a0a0b] py-1">
-                  {11 + colSize}-{10 + colSize * 2}
+                  {11 + colSize}-{10 + colSize * 2} · Meja · Babak · Total
                 </h3>
               )}
               {colIndex === 2 && (
                 <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2 sticky top-0 bg-[#0a0a0b] py-1">
-                  {11 + colSize * 2}-{players.length}
+                  {11 + colSize * 2}-{players.length} · Meja · Babak · Total
                 </h3>
               )}
               <div className="space-y-0">

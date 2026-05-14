@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Users, Maximize2, Minimize2 } from "lucide-react";
 import LeaderboardScreen from "./LeaderboardScreen";
@@ -8,8 +8,16 @@ import TablesScreen from "./TablesScreen";
 import { ScreenType, Player, Table } from "./types";
 import { PlayerScore } from "../player/types";
 
-function convertToPlayers(scores: PlayerScore[]): Player[] {
-  return scores.map((p, index) => ({
+function convertToPlayers(scores: PlayerScore[], currentPhase: number): Player[] {
+  const sortedScores = [...scores].sort((a, b) => {
+    if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+    const tableA = a.currentTable ?? Number.MAX_SAFE_INTEGER;
+    const tableB = b.currentTable ?? Number.MAX_SAFE_INTEGER;
+    if (tableA !== tableB) return tableA - tableB;
+    return a.name.localeCompare(b.name);
+  });
+
+  return sortedScores.map((p, index) => ({
     id: p.id,
     name: p.name,
     team: p.team,
@@ -17,13 +25,14 @@ function convertToPlayers(scores: PlayerScore[]): Player[] {
     rank: index + 1,
     status: p.status,
     currentTable: p.currentTable,
+    currentPhaseScore: p.scores?.[currentPhase]?.points ?? 0,
   }));
 }
 
 export default function ScreenController() {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>("leaderboard");
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [players, setPlayers] = useState<Player[]>([]);
+  const [playerScores, setPlayerScores] = useState<PlayerScore[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [currentPhase, setCurrentPhase] = useState(1);
 
@@ -52,8 +61,8 @@ export default function ScreenController() {
     es.onmessage = (e) => {
       try {
         const data: PlayerScore[] = JSON.parse(e.data);
-        if (Array.isArray(data) && data.length > 0) {
-          setPlayers(convertToPlayers(data));
+        if (Array.isArray(data)) {
+          setPlayerScores(data);
         }
       } catch {
         // ignore malformed events
@@ -68,7 +77,7 @@ export default function ScreenController() {
     es.onmessage = (e) => {
       try {
         const data: Table[] = JSON.parse(e.data);
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setTables(data);
         }
       } catch {
@@ -79,6 +88,10 @@ export default function ScreenController() {
   }, []);
 
   const displayTables = tables;
+  const players = useMemo(
+    () => convertToPlayers(playerScores, currentPhase),
+    [currentPhase, playerScores]
+  );
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {

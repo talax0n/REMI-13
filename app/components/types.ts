@@ -8,6 +8,7 @@ export interface Player {
   status?: 'active' | 'eliminated' | 'winner' | 'dummy';
   isDummy?: boolean;
   currentTable?: number;
+  currentPhaseScore?: number;
 }
 
 export interface Table {
