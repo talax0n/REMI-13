@@ -108,7 +108,7 @@ async function runMigration(): Promise<void> {
           WHERE table_name = 'players' AND column_name = 'team'
         ) THEN
           UPDATE players SET team = church WHERE team IS NULL OR team = '';
-          ALTER TABLE players ALTER COLUMN church DROP NOT NULL;
+          ALTER TABLE players DROP COLUMN church;
         END IF;
       END $$;
     `);
