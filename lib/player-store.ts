@@ -88,10 +88,15 @@ export async function updatePlayerPhaseScore(
   };
   await query(
     `UPDATE players
-     SET scores = scores || jsonb_build_object($1::text, $2::jsonb),
+     SET total_score = total_score
+           + $4::integer
+           - COALESCE((scores -> $1::text ->> 'points')::integer, 0),
+         matches_played = matches_played
+           + CASE WHEN scores ? $1::text THEN 0 ELSE 1 END,
+         scores = scores || jsonb_build_object($1::text, $2::jsonb),
          updated_at = NOW()
      WHERE id = $3`,
-    [String(phase), JSON.stringify(phaseScore), playerId]
+    [String(phase), JSON.stringify(phaseScore), playerId, points]
   );
 }
 

@@ -128,6 +128,7 @@ export default function AdminPage() {
       .then((data) => {
         setParticipants(data.participants);
         setTournamentState(data.tournamentState);
+        setPhaseScores(data.phaseScores ?? {});
         setSemifinalCutoff(data.tournamentState.semifinalCutoff ?? 20);
         setFinalCutoff(data.tournamentState.finalCutoff ?? 10);
         // Enable syncing only AFTER the initial load settles.
@@ -561,10 +562,14 @@ export default function AdminPage() {
         if (!update) return p;
         
         // Calculate the change from previous score for this phase
-        const previousScore = phaseScores[update.id]?.[update.phase] ?? 0;
-        const scoreChange = update.score - previousScore;
+        const previousScore = phaseScores[update.id]?.[update.phase];
+        const scoreChange = update.score - (previousScore ?? 0);
         
-        return { ...p, score: p.score + scoreChange };
+        return {
+          ...p,
+          score: p.score + scoreChange,
+          matchesPlayed: previousScore === undefined ? p.matchesPlayed + 1 : p.matchesPlayed,
+        };
       })
     );
     

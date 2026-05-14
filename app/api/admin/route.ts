@@ -11,6 +11,7 @@ interface PlayerRow {
   total_score: number;
   status: string;
   current_table: number | null;
+  scores: Record<string, { points: number }>;
   opponents: string[];
   matches_played: number;
 }
@@ -59,10 +60,22 @@ export async function GET() {
     tableNumber: row.current_table ?? undefined,
     opponents: row.opponents ?? [],
   }));
+  const phaseScores = Object.fromEntries(
+    playerRows.map((row) => [
+      row.id,
+      Object.fromEntries(
+        Object.entries(row.scores ?? {}).map(([phase, score]) => [
+          Number(phase),
+          score.points ?? 0,
+        ])
+      ),
+    ])
+  );
 
   const activeCount = participants.filter((p) => p.status === 'active').length;
   return Response.json({
     participants,
+    phaseScores,
     tournamentState: {
       phase: tournamentState.phase,
       status: tournamentState.status,
