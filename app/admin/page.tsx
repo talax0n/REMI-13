@@ -331,19 +331,6 @@ export default function AdminPage() {
       score: p.score,
       opponents: new Set(p.opponents ?? []),
     }));
-    const realCount = engineParticipants.length;
-    const dummyCount = (5 - (realCount % 5)) % 5;
-    for (let i = 0; i < dummyCount; i++) {
-      engineParticipants.push({
-        id: `dummy-${Date.now()}-${i + 1}`,
-        name: `Dummy ${i + 1}`,
-        team: `__dummy_${i + 1}`,
-        score: 0,
-        opponents: new Set(),
-        isDummy: true,
-      });
-    }
-
     let tableGroups: EngineParticipant[][];
     let warnings: string[] = [];
 
