@@ -88,11 +88,12 @@ export default function TableScoring({
 
   const handleScoreChange = (participantId: string, value: string) => {
     if (participantId.startsWith('dummy-')) return;
+    if (!/^\d*$/.test(value)) return;
     if (value === '') {
       setScores((prev) => ({ ...prev, [participantId]: null }));
       return;
     }
-    const numValue = parseInt(value, 10);
+    const numValue = Number(value);
     if (Number.isNaN(numValue) || numValue < 0) return;
     setScores((prev) => ({ ...prev, [participantId]: numValue }));
   };
@@ -416,10 +417,10 @@ export default function TableScoring({
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-zinc-500">Babak {currentPhase}</span>
                       <Input
-                        type="number"
-                        min="0"
+                        type="text"
                         inputMode="numeric"
                         pattern="[0-9]*"
+                        autoComplete="off"
                         value={inputValue}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                           handleScoreChange(player.id, e.target.value)
