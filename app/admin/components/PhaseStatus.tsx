@@ -22,8 +22,8 @@ function getPhaseLabel(
 ): string {
   if (phase === finalPhase) return `Final (Top ${finalCutoff})`;
   if (phase === semifinalPhase) return `Semifinal (Top ${semifinalCutoff})`;
-  if (phase < semifinalPhase) return `Fase Reguler ${phase}`;
-  return `Phase ${phase}`;
+  if (phase < semifinalPhase) return `Babak Reguler ${phase}`;
+  return `Babak ${phase}`;
 }
 
 const statusConfig = {
@@ -68,9 +68,9 @@ export default function PhaseStatus({ state, semifinalCutoff, finalCutoff }: Pha
           {/* Current Phase */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-zinc-500">Current Phase</p>
+              <p className="text-sm text-zinc-500">Current Babak</p>
               <p className="text-2xl font-bold text-white">
-                Phase {state.phase} 
+                Babak {state.phase}
                 <span className="text-base font-normal text-zinc-400 ml-2">
                   {getPhaseLabel(state.phase, state.semifinalPhase, state.finalPhase, semifinalCutoff, finalCutoff)}
                 </span>

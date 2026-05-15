@@ -460,8 +460,8 @@ export function generateTables(
 
   if (bestRepeats > 0) {
     warnings.push(
-      `${bestRepeats} pasangan pernah bertemu di fase sebelumnya. ` +
-        `Ini wajar mulai fase 4-5 dengan banyak peserta dan team besar.`,
+      `${bestRepeats} pasangan pernah bertemu di babak sebelumnya. ` +
+        `Ini wajar mulai babak 4-5 dengan banyak peserta dan team besar.`,
     );
   }
 

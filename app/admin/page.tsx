@@ -518,8 +518,8 @@ export default function AdminPage() {
       persistTournamentState(next);
       return next;
     });
-    toast.success('Konfigurasi fase tersimpan', {
-      description: `Total ${safeMax} fase · Semifinal di Fase ${safeSemifinal} · Final di Fase ${safeFinal}.`,
+    toast.success('Konfigurasi babak tersimpan', {
+      description: `Total ${safeMax} babak · Semifinal di Babak ${safeSemifinal} · Final di Babak ${safeFinal}.`,
     });
   }, [persistTournamentState]);
 
@@ -756,7 +756,7 @@ export default function AdminPage() {
               />
               <div className="absolute right-3 top-full mt-2 z-50 w-64 bg-zinc-900 border border-white/10 rounded-xl shadow-xl shadow-black/40 p-2 space-y-1">
                 <div className="flex items-center justify-between gap-2 px-2 py-2 rounded-lg bg-zinc-800/60">
-                  <span className="text-[11px] uppercase tracking-wider text-zinc-500">Phase</span>
+                  <span className="text-[11px] uppercase tracking-wider text-zinc-500">Babak</span>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -765,7 +765,7 @@ export default function AdminPage() {
                         setShowPhaseBackWarning(true);
                       }}
                       disabled={tournamentState.phase === 1}
-                      aria-label="Previous phase"
+                      aria-label="Previous babak"
                       className="inline-flex w-8 h-8 items-center justify-center rounded-md border border-white/10 text-white disabled:opacity-30 hover:bg-white/10"
                     >
                       <SkipBack className="w-3.5 h-3.5" />
@@ -871,7 +871,7 @@ export default function AdminPage() {
                   <SkipBack className="w-4 h-4" />
                 </Button>
                 <div className="text-right">
-                  <p className="text-sm text-zinc-500">Phase</p>
+                  <p className="text-sm text-zinc-500">Babak</p>
                   <p className="text-lg font-bold text-white">
                     {tournamentState.phase} <span className="text-zinc-500">/ {tournamentState.maxPhases}</span>
                   </p>
@@ -995,6 +995,7 @@ export default function AdminPage() {
           ) : (
             <TableScoring
               currentPhase={tournamentState.phase}
+              phaseScores={phaseScores}
               onSaveScores={handleSaveScores}
             />
           )}
@@ -1058,10 +1059,10 @@ export default function AdminPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
               <AlertTriangle className="w-6 h-6 text-yellow-500" />
-              Go Back to Previous Phase?
+              Go Back to Previous Babak?
             </DialogTitle>
             <DialogDescription className="text-zinc-400 pt-2">
-              You are about to go back from Phase {tournamentState.phase} to Phase {tournamentState.phase - 1}.
+              You are about to go back from Babak {tournamentState.phase} to Babak {tournamentState.phase - 1}.
               <br /><br />
               <span className="text-yellow-400 font-medium">Warning:</span> This action should only be used if you made a mistake. Players may have already seen scores for the current phase.
             </DialogDescription>

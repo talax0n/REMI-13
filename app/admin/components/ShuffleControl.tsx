@@ -60,7 +60,7 @@ export default function ShuffleControl({
     if (!canShuffle) {
       if (state.phase >= state.maxPhases) {
         toast.error('Turnamen selesai', {
-          description: 'Semua fase telah selesai.',
+          description: 'Semua babak telah selesai.',
         });
       } else if (state.totalParticipants < 1) {
         toast.error('Peserta tidak cukup', {
@@ -93,7 +93,7 @@ export default function ShuffleControl({
       const label =
         targetPhase === state.semifinalPhase ? `Semifinal (Top ${semifinalCutoff})` :
         targetPhase === state.finalPhase ? `Final (Top ${finalCutoff})` :
-        `Fase ${targetPhase}`;
+        `Babak ${targetPhase}`;
       toast.success('Meja berhasil dibuat', {
         id: 'shuffle',
         description: `Meja untuk ${label} sudah siap.`,
@@ -163,8 +163,8 @@ export default function ShuffleControl({
             <Alert className="bg-red-500/10 border-red-500/30 text-red-300">
               <AlertTriangle className="w-4 h-4" />
               <AlertDescription className="text-red-200">
-                {scoredSeatedCount} dari {totalSeatedCount} pemain sudah punya skor untuk Fase {state.phase}.
-                Generate ulang sekarang akan membuang skor tersebut. Lengkapi skor {missingScoreCount} pemain lain dulu untuk lanjut ke fase berikutnya.
+                {scoredSeatedCount} dari {totalSeatedCount} pemain sudah punya skor untuk Babak {state.phase}.
+                Generate ulang sekarang akan membuang skor tersebut. Lengkapi skor {missingScoreCount} pemain lain dulu untuk lanjut ke babak berikutnya.
               </AlertDescription>
             </Alert>
           )}
@@ -211,10 +211,10 @@ export default function ShuffleControl({
             </DialogTitle>
             <DialogDescription className="text-zinc-400">
               {targetPhase === state.semifinalPhase
-                ? `Akan memilih ${semifinalCutoff} pemain teratas untuk Semifinal (Fase ${state.semifinalPhase}).`
+                ? `Akan memilih ${semifinalCutoff} pemain teratas untuk Semifinal (Babak ${state.semifinalPhase}).`
                 : targetPhase === state.finalPhase
-                ? `Akan memilih ${finalCutoff} pemain teratas untuk Final (Fase ${state.finalPhase}).`
-                : `Akan men-shuffle meja untuk Fase ${targetPhase}.`}
+                ? `Akan memilih ${finalCutoff} pemain teratas untuk Final (Babak ${state.finalPhase}).`
+                : `Akan men-shuffle meja untuk Babak ${targetPhase}.`}
             </DialogDescription>
           </DialogHeader>
 
@@ -297,7 +297,7 @@ export default function ShuffleControl({
               Skor Belum Lengkap
             </DialogTitle>
             <DialogDescription className="text-zinc-400">
-              Sebagian pemain sudah punya skor untuk Fase {state.phase}, tapi belum semua.
+              Sebagian pemain sudah punya skor untuk Babak {state.phase}, tapi belum semua.
               Men-generate ulang sekarang akan menyusun ulang meja dan membuang skor yang sudah masuk.
             </DialogDescription>
           </DialogHeader>
@@ -322,7 +322,7 @@ export default function ShuffleControl({
               <AlertTriangle className="w-4 h-4" />
               <AlertDescription className="text-red-200">
                 <span className="font-semibold">{scoredSeatedCount} skor</span> yang sudah diinput akan hilang.
-                Untuk maju ke fase berikutnya, lengkapi skor {missingScoreCount} pemain yang belum diinput.
+                Untuk maju ke babak berikutnya, lengkapi skor {missingScoreCount} pemain yang belum diinput.
               </AlertDescription>
             </Alert>
 

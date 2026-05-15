@@ -14,6 +14,7 @@ import { PlayerScore } from '../../player/types';
 
 interface TableScoringProps {
   currentPhase: number;
+  phaseScores: Record<string, Record<number, number>>;
   onSaveScores: (updates: { id: string; score: number; phase: number }[]) => Promise<void>;
 }
 
@@ -21,14 +22,28 @@ function getTeamStyle(team: string) {
   return getTeamColor(team);
 }
 
-export default function TableScoring({ currentPhase = 1, onSaveScores }: TableScoringProps) {
+export default function TableScoring({ currentPhase = 1, phaseScores, onSaveScores }: TableScoringProps) {
   const [tables, setTables] = useState<Table[]>([]);
   const [playerScores, setPlayerScores] = useState<Map<string, number>>(new Map());
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
-  const [scores, setScores] = useState<Record<string, number>>({});
+  const [scores, setScores] = useState<Record<string, number | null>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [hasChanges, setHasChanges] = useState(false);
+
+  const getStoredPhasePoints = useCallback(
+    (id: string) => phaseScores[id]?.[currentPhase],
+    [phaseScores, currentPhase]
+  );
+
+  // Reset pending edits whenever the active phase changes so values
+  // never carry over and get attributed to the wrong babak.
+  useEffect(() => {
+    setScores({});
+  }, [currentPhase]);
+
+  const hasChanges = Object.entries(scores).some(
+    ([id, value]) => typeof value === 'number' && value !== getStoredPhasePoints(id)
+  );
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -58,9 +73,13 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
 
   const handleScoreChange = (participantId: string, value: string) => {
     if (participantId.startsWith('dummy-')) return;
-    const numValue = parseInt(value) || 0;
+    if (value === '') {
+      setScores((prev) => ({ ...prev, [participantId]: null }));
+      return;
+    }
+    const numValue = parseInt(value, 10);
+    if (Number.isNaN(numValue) || numValue < 0) return;
     setScores((prev) => ({ ...prev, [participantId]: numValue }));
-    setHasChanges(true);
   };
 
   // Subscribe to live score updates via EventSource
@@ -87,14 +106,19 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
 
     setIsSaving(true);
     try {
-      const updates = Object.entries(scores).map(([id, score]) => ({
-        id,
-        score,
-        phase: currentPhase,
-      })).filter((update) => !update.id.startsWith('dummy-'));
+      const updates: { id: string; score: number; phase: number }[] = [];
+      for (const [id, score] of Object.entries(scores)) {
+        if (id.startsWith('dummy-')) continue;
+        if (typeof score !== 'number') continue;
+        if (score === getStoredPhasePoints(id)) continue;
+        updates.push({ id, score, phase: currentPhase });
+      }
+      if (updates.length === 0) {
+        toast.info('No changes to save');
+        return;
+      }
       await onSaveScores(updates);
       toast.success('Scores saved');
-      setHasChanges(false);
       setScores({});
       // Note: fetchData() is no longer needed here since EventSource updates scores in real-time
     } catch {
@@ -106,15 +130,16 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
 
   const handleReset = () => {
     setScores({});
-    setHasChanges(false);
     toast.info('Scores reset');
   };
 
   const handleBackToTables = () => {
     if (hasChanges) {
-      toast.warning('You have unsaved changes!', {
-        action: { label: 'Save', onClick: handleSave },
-      });
+      const ok = window.confirm(
+        'You have unsaved score changes. Leave without saving?'
+      );
+      if (!ok) return;
+      setScores({});
     }
     setSelectedTable(null);
   };
@@ -176,8 +201,10 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {tables.map((table, index) => {
             const realPlayers = table.players.filter((p) => !p.isDummy);
-            const hasScores = realPlayers.some((p) => scores[p.id] !== undefined);
-            const scoredCount = realPlayers.filter((p) => scores[p.id] !== undefined).length;
+            const isScoredForPhase = (id: string) =>
+              typeof scores[id] === 'number' || getStoredPhasePoints(id) !== undefined;
+            const hasScores = realPlayers.some((p) => isScoredForPhase(p.id));
+            const scoredCount = realPlayers.filter((p) => isScoredForPhase(p.id)).length;
             return (
               <motion.button
                 key={table.number}
@@ -237,8 +264,20 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
             </p>
           </div>
           <div className="bg-zinc-900/50 border border-white/10 rounded-xl p-3">
-            <p className="text-xs text-zinc-500 uppercase tracking-wider">Scored Now</p>
-            <p className="text-xl font-bold text-blue-400">{Object.keys(scores).length}</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-wider">Scored This Babak</p>
+            <p className="text-xl font-bold text-blue-400">
+              {tables.reduce(
+                (s, t) =>
+                  s
+                  + t.players.filter(
+                    (p) =>
+                      !p.isDummy
+                      && (typeof scores[p.id] === 'number'
+                        || getStoredPhasePoints(p.id) !== undefined)
+                  ).length,
+                0
+              )}
+            </p>
           </div>
         </div>
       </motion.div>
@@ -296,7 +335,22 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
         <AnimatePresence mode="popLayout">
           {currentTable?.players.map((player: Player, index: number) => {
             const dbScore = playerScores.get(player.id) ?? player.score;
-            const hasNewScore = scores[player.id] !== undefined;
+            const storedPhasePoints = getStoredPhasePoints(player.id);
+            const pendingPhasePoints = scores[player.id];
+            const inputValue =
+              pendingPhasePoints === null
+                ? ''
+                : pendingPhasePoints ?? storedPhasePoints ?? '';
+            const effectivePhasePoints =
+              typeof pendingPhasePoints === 'number'
+                ? pendingPhasePoints
+                : storedPhasePoints;
+            const hasPendingChange =
+              typeof pendingPhasePoints === 'number'
+                && pendingPhasePoints !== storedPhasePoints;
+            const hasNewScore = effectivePhasePoints !== undefined;
+            const projectedTotal =
+              dbScore - (storedPhasePoints ?? 0) + (effectivePhasePoints ?? 0);
             const teamStyle = getTeamStyle(player.team);
             const isDummy = !!player.isDummy;
 
@@ -308,7 +362,11 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
                 transition={{ delay: index * 0.05 }}
                 className={`
                   bg-zinc-900/50 border rounded-2xl p-4 transition-colors
-                  ${hasNewScore ? 'border-emerald-500/30' : 'border-white/10'}
+                  ${hasPendingChange
+                    ? 'border-amber-500/40'
+                    : hasNewScore
+                      ? 'border-emerald-500/30'
+                      : 'border-white/10'}
                 `}
               >
                 <div className="flex items-start gap-3">
@@ -329,7 +387,7 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
                       {isDummy ? 'Placeholder' : player.team}
                     </span>
                     <div className="mt-2 flex items-center gap-2">
-                      <span className="text-xs text-zinc-500">Current:</span>
+                      <span className="text-xs text-zinc-500">Saved Total:</span>
                       <span className="text-sm font-mono text-zinc-400">
                         {dbScore.toLocaleString()}
                       </span>
@@ -338,13 +396,13 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
 
                   <div className="flex flex-col items-end gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-zinc-500">+</span>
+                      <span className="text-xs text-zinc-500">Babak {currentPhase}</span>
                       <Input
                         type="number"
                         min="0"
                         inputMode="numeric"
                         pattern="[0-9]*"
-                        value={scores[player.id] ?? ''}
+                        value={inputValue}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                           handleScoreChange(player.id, e.target.value)
                         }
@@ -359,9 +417,9 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
                       />
                     </div>
                     <div className="text-right">
-                      <span className="text-xs text-zinc-500">= </span>
-                      <span className={`text-lg font-black tabular-nums ${hasNewScore ? 'text-emerald-400' : 'text-zinc-400'}`}>
-                        {(dbScore + (scores[player.id] || 0)).toLocaleString()}
+                      <span className="text-xs text-zinc-500">Total </span>
+                      <span className={`text-lg font-black tabular-nums ${hasPendingChange ? 'text-amber-300' : hasNewScore ? 'text-emerald-400' : 'text-zinc-400'}`}>
+                        {projectedTotal.toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -379,7 +437,15 @@ export default function TableScoring({ currentPhase = 1, onSaveScores }: TableSc
               <p className="text-sm text-zinc-400">
                 {hasChanges ? 'Unsaved changes' : 'All changes saved'}
               </p>
-              <p className="text-xs text-zinc-500">{Object.keys(scores).length} scores entered</p>
+              <p className="text-xs text-zinc-500">
+                {Object.entries(scores).filter(
+                  ([id, value]) =>
+                    typeof value === 'number' && value !== getStoredPhasePoints(id)
+                ).length} pending change{Object.entries(scores).filter(
+                  ([id, value]) =>
+                    typeof value === 'number' && value !== getStoredPhasePoints(id)
+                ).length === 1 ? '' : 's'}
+              </p>
             </div>
             <div className="flex gap-2">
               <Button

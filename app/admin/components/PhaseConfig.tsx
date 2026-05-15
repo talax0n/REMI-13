@@ -43,11 +43,11 @@ export default function PhaseConfig({
   const regularPhases = Math.max(0, semiInput - 1);
   const validationError =
     !Number.isFinite(maxInput) || maxInput < 2
-      ? 'Total fase minimal 2.'
+      ? 'Total babak minimal 2.'
       : !Number.isFinite(finalInput) || finalInput < 2 || finalInput > maxInput
-        ? `Fase Final harus antara 2 dan ${maxInput}.`
+        ? `Babak Final harus antara 2 dan ${maxInput}.`
         : !Number.isFinite(semiInput) || semiInput < 1 || semiInput >= finalInput
-          ? `Fase Semifinal harus antara 1 dan ${finalInput - 1}.`
+          ? `Babak Semifinal harus antara 1 dan ${finalInput - 1}.`
           : null;
 
   const isDirty =
@@ -80,9 +80,9 @@ export default function PhaseConfig({
           <Settings2 className="w-5 h-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-white">Phase Configuration</p>
+          <p className="text-sm font-semibold text-white">Babak Configuration</p>
           <p className="text-xs text-zinc-500 truncate">
-            {maxPhases} fase · Semifinal F{semifinalPhase} · Final F{finalPhase}
+            {maxPhases} babak · Semifinal B{semifinalPhase} · Final B{finalPhase}
           </p>
         </div>
       </button>
@@ -92,10 +92,10 @@ export default function PhaseConfig({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings2 className="w-5 h-5 text-purple-400" />
-              Phase Configuration
+              Babak Configuration
             </DialogTitle>
             <DialogDescription className="text-zinc-400">
-              Atur total fase turnamen serta fase mana yang jadi Semifinal dan Final.
+              Atur total babak turnamen serta babak mana yang jadi Semifinal dan Final.
             </DialogDescription>
           </DialogHeader>
 
@@ -103,7 +103,7 @@ export default function PhaseConfig({
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1">
                 <label className="text-xs uppercase tracking-wider text-zinc-500">
-                  Total Fase
+                  Total Babak
                 </label>
                 <Input
                   type="number"
@@ -115,7 +115,7 @@ export default function PhaseConfig({
               </div>
               <div className="space-y-1">
                 <label className="text-xs uppercase tracking-wider text-zinc-500">
-                  Fase Semifinal
+                  Babak Semifinal
                 </label>
                 <Input
                   type="number"
@@ -127,7 +127,7 @@ export default function PhaseConfig({
               </div>
               <div className="space-y-1">
                 <label className="text-xs uppercase tracking-wider text-zinc-500">
-                  Fase Final
+                  Babak Final
                 </label>
                 <Input
                   type="number"
@@ -141,9 +141,9 @@ export default function PhaseConfig({
 
             <div className="rounded-lg border border-white/5 bg-zinc-800/40 p-3 text-xs text-zinc-400">
               <p>
-                <span className="text-zinc-300 font-medium">{regularPhases}</span> fase reguler ·{' '}
-                <span className="text-zinc-300 font-medium">Fase {Number.isFinite(semiInput) ? semiInput : '?'}</span> Semifinal ·{' '}
-                <span className="text-zinc-300 font-medium">Fase {Number.isFinite(finalInput) ? finalInput : '?'}</span> Final
+                <span className="text-zinc-300 font-medium">{regularPhases}</span> babak reguler ·{' '}
+                <span className="text-zinc-300 font-medium">Babak {Number.isFinite(semiInput) ? semiInput : '?'}</span> Semifinal ·{' '}
+                <span className="text-zinc-300 font-medium">Babak {Number.isFinite(finalInput) ? finalInput : '?'}</span> Final
               </p>
               <p className="mt-1 text-zinc-500">
                 Cutoff Top-N untuk Semifinal/Final diatur di kartu Table Generation.
@@ -161,7 +161,7 @@ export default function PhaseConfig({
               <Alert className="bg-yellow-500/10 border-yellow-500/30 text-yellow-300">
                 <AlertTriangle className="w-4 h-4" />
                 <AlertDescription className="text-yellow-200">
-                  Fase saat ini ({currentPhase}) melebihi total fase baru. Fase akan diatur ulang ke {maxInput}.
+                  Babak saat ini ({currentPhase}) melebihi total babak baru. Babak akan diatur ulang ke {maxInput}.
                 </AlertDescription>
               </Alert>
             )}

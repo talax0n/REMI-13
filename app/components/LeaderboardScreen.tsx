@@ -423,7 +423,7 @@ export default function LeaderboardScreen({ players, currentPhase = 1 }: Leaderb
       ? 'Semifinal'
       : currentPhase === 6
         ? 'Final'
-        : `Fase ${currentPhase}`;
+        : `Babak ${currentPhase}`;
 
   const trimmed = query.trim().toLowerCase();
   const filtered = useMemo(() => {

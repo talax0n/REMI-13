@@ -95,7 +95,7 @@ function addPairingSheet(
   worksheet.mergeCells('A1:F1');
   worksheet.mergeCells('A2:F2');
   worksheet.getCell('A1').value = title;
-  worksheet.getCell('A2').value = `Phase ${phase} · Generated ${generatedAt}`;
+  worksheet.getCell('A2').value = `Babak ${phase} · Generated ${generatedAt}`;
   styleTitleRow(worksheet, 1);
   styleTitleRow(worksheet, 2);
 

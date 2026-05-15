@@ -380,7 +380,7 @@ function PlayerProfile({
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-emerald-400" />
-              Phase Progress
+              Babak Progress
             </h3>
             <span className="text-sm text-zinc-500">
               {completedPhases}/{MAX_PHASES} completed
@@ -442,7 +442,7 @@ function PlayerProfile({
                       {/* Phase Info */}
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold text-white leading-tight">Phase {phaseNum}</p>
+                          <p className="font-semibold text-white leading-tight">Babak {phaseNum}</p>
                           {isCurrent && (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30">
                               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
@@ -512,7 +512,7 @@ function PlayerProfile({
           <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
             <div className="min-w-0">
               <p className="text-xl sm:text-2xl font-bold text-white tabular-nums">{completedPhases}</p>
-              <p className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider">Phases</p>
+              <p className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider">Babak</p>
             </div>
             <div className="min-w-0">
               <p className="text-xl sm:text-2xl font-bold text-emerald-400 tabular-nums">
