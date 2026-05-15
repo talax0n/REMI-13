@@ -64,36 +64,45 @@ export default function ScreenController() {
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
-  // Subscribe to live player scores (leaderboard)
+  // Poll player scores. Avoid long-lived SSE DB polling; repeated display tabs can
+  // exhaust small hosted Postgres session limits and leave the screen empty.
   useEffect(() => {
-    const es = new EventSource("/api/player/stream");
-    es.onmessage = (e) => {
+    let cancelled = false;
+    async function fetchPlayers() {
       try {
-        const data: PlayerScore[] = JSON.parse(e.data);
-        if (Array.isArray(data)) {
+        const res = await fetch("/api/player", { cache: "no-store" });
+        if (!res.ok) return;
+        const data: PlayerScore[] = await res.json();
+        if (!cancelled && Array.isArray(data)) {
           setPlayerScores(data);
         }
       } catch {
-        // ignore malformed events
+        // keep the last good snapshot visible
       }
-    };
-    return () => es.close();
+    }
+    fetchPlayers();
+    const interval = setInterval(fetchPlayers, 5000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
-  // Subscribe to real-time table updates via SSE
+  // Poll table updates with the same bounded request pattern.
   useEffect(() => {
-    const es = new EventSource("/api/tables/stream");
-    es.onmessage = (e) => {
+    let cancelled = false;
+    async function fetchTables() {
       try {
-        const data: Table[] = JSON.parse(e.data);
-        if (Array.isArray(data)) {
+        const res = await fetch("/api/tables", { cache: "no-store" });
+        if (!res.ok) return;
+        const data: Table[] = await res.json();
+        if (!cancelled && Array.isArray(data)) {
           setTables(data);
         }
       } catch {
-        // ignore malformed events
+        // keep the last good snapshot visible
       }
-    };
-    return () => es.close();
+    }
+    fetchTables();
+    const interval = setInterval(fetchTables, 5000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
   const displayTables = tables;

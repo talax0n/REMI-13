@@ -577,14 +577,17 @@ export default function PlayerPage() {
     };
   }, []);
 
-  // Subscribe to the same live stream the leaderboard uses.
+  // Poll the same public player API the leaderboard uses.
   // - Populates the name/team search from real player data.
   // - Keeps the profile view in sync when admin records scores.
   useEffect(() => {
-    const es = new EventSource('/api/player/stream');
-    es.onmessage = (e) => {
+    let cancelled = false;
+    async function fetchPlayers() {
       try {
-        const data: PlayerScore[] = JSON.parse(e.data);
+        const response = await fetch('/api/player', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data: PlayerScore[] = await response.json();
+        if (cancelled) return;
         if (!Array.isArray(data)) return;
         setAllPlayers(data);
         // Update the displayed profile with fresh score + live rank
@@ -595,10 +598,15 @@ export default function PlayerPage() {
           return { ...data[idx], rank: idx + 1 };
         });
       } catch {
-        // ignore malformed events
+        // keep the last good snapshot visible
       }
+    }
+    fetchPlayers();
+    const interval = setInterval(fetchPlayers, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
     };
-    return () => es.close();
   }, []);
 
   // Derived from live stream — same source as the leaderboard
