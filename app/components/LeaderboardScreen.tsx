@@ -231,7 +231,7 @@ function CompactLeaderboardRow({ player, index }: { player: Player; index: numbe
       className={`flex min-h-0 flex-1 items-center gap-2 2xl:gap-3 rounded-md border px-2 py-1 2xl:px-3 2xl:py-1.5 ${
         isEliminated
           ? 'border-white/[0.03] bg-zinc-950/50 opacity-55'
-          : player.rank <= 3
+          : player.rank <= 20
             ? 'border-yellow-500/20 bg-yellow-500/10'
             : 'border-white/[0.04] bg-zinc-900/55'
       }`}
