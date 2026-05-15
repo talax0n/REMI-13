@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Filter, Users, ChevronUp, ChevronDown, Trash2, Edit2, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Archive, RotateCcw } from 'lucide-react';
+import { Search, Filter, Users, ChevronUp, ChevronDown, Trash2, Edit2, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Archive, RotateCcw, CheckSquare } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -171,18 +171,13 @@ export default function ParticipantTable({
     () => participants.filter((participant) => selectedIds.has(participant.id)),
     [participants, selectedIds]
   );
-  const visibleSelectableIds = useMemo(
-    () => paginatedParticipants.map((participant) => participant.id),
-    [paginatedParticipants]
+  const filteredSelectableIds = useMemo(
+    () => filteredParticipants.map((participant) => participant.id),
+    [filteredParticipants]
   );
-  const allVisibleSelected = visibleSelectableIds.length > 0
-    && visibleSelectableIds.every((id) => selectedIds.has(id));
-  const someVisibleSelected = visibleSelectableIds.some((id) => selectedIds.has(id));
-  const allFilteredSelected = filteredParticipants.length > 0
-    && filteredParticipants.every((participant) => selectedIds.has(participant.id));
-  const canSelectAllFiltered = allVisibleSelected
-    && filteredParticipants.length > visibleSelectableIds.length
-    && !allFilteredSelected;
+  const allFilteredSelected = filteredSelectableIds.length > 0
+    && filteredSelectableIds.every((id) => selectedIds.has(id));
+  const someFilteredSelected = filteredSelectableIds.some((id) => selectedIds.has(id));
 
   useEffect(() => {
     setSelectedIds((prev) => {
@@ -201,21 +196,13 @@ export default function ParticipantTable({
     });
   };
 
-  const toggleVisibleSelected = (selected: boolean) => {
+  const toggleAllFilteredSelected = (selected: boolean) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      visibleSelectableIds.forEach((id) => {
+      filteredSelectableIds.forEach((id) => {
         if (selected) next.add(id);
         else next.delete(id);
       });
-      return next;
-    });
-  };
-
-  const selectAllFiltered = () => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      filteredParticipants.forEach((participant) => next.add(participant.id));
       return next;
     });
   };
@@ -338,16 +325,30 @@ export default function ParticipantTable({
             </div>
           </div>
 
-          {selectedParticipants.length > 0 && (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-3">
-              <div>
-                <p className="text-sm font-medium text-cyan-100">
-                  {selectedParticipants.length} selected
-                </p>
-                <p className="text-xs text-cyan-300/70">
-                  Bulk actions apply to selected participants across all pages.
-                </p>
-              </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-white/10 bg-zinc-800/40 p-3">
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  allFilteredSelected
+                    ? toggleAllFilteredSelected(false)
+                    : toggleAllFilteredSelected(true)
+                }
+                disabled={filteredParticipants.length === 0}
+                className="border-white/20 text-white hover:bg-white/10"
+              >
+                <CheckSquare className="w-4 h-4 mr-2" />
+                {allFilteredSelected
+                  ? `Deselect all (${filteredParticipants.length})`
+                  : `Select all (${filteredParticipants.length})`}
+              </Button>
+              <p className="text-sm text-zinc-300">
+                {selectedParticipants.length} selected
+              </p>
+            </div>
+            {selectedParticipants.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {onArchiveMany && (
                   <>
@@ -399,44 +400,8 @@ export default function ParticipantTable({
                   Clear
                 </Button>
               </div>
-            </div>
-          )}
-
-          {(canSelectAllFiltered || allFilteredSelected) && (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-white/10 bg-zinc-800/40 px-3 py-2 text-sm">
-              {canSelectAllFiltered ? (
-                <>
-                  <span className="text-zinc-300">
-                    All {visibleSelectableIds.length} on this page selected.
-                  </span>
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    onClick={selectAllFiltered}
-                    className="text-cyan-400 hover:text-cyan-300 px-0 self-start sm:self-auto"
-                  >
-                    Select all {filteredParticipants.length} matching participants
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <span className="text-zinc-300">
-                    All {filteredParticipants.length} matching participants selected.
-                  </span>
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    onClick={() => setSelectedIds(new Set())}
-                    className="text-cyan-400 hover:text-cyan-300 px-0 self-start sm:self-auto"
-                  >
-                    Clear selection
-                  </Button>
-                </>
-              )}
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Table */}
           <div className="border border-white/10 rounded-lg overflow-x-auto">
@@ -446,12 +411,12 @@ export default function ParticipantTable({
                   <TableHead className="w-10 text-center">
                     <input
                       type="checkbox"
-                      aria-label="Select visible participants"
-                      checked={allVisibleSelected}
+                      aria-label="Select all filtered participants"
+                      checked={allFilteredSelected}
                       ref={(input) => {
-                        if (input) input.indeterminate = !allVisibleSelected && someVisibleSelected;
+                        if (input) input.indeterminate = !allFilteredSelected && someFilteredSelected;
                       }}
-                      onChange={(e) => toggleVisibleSelected(e.target.checked)}
+                      onChange={(e) => toggleAllFilteredSelected(e.target.checked)}
                       className="h-4 w-4 rounded border-white/20 bg-zinc-900 accent-cyan-500"
                     />
                   </TableHead>
