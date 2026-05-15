@@ -228,7 +228,9 @@ function CompactLeaderboardRow({ player, index }: { player: Player; index: numbe
             : 'border-white/[0.04] bg-zinc-900/55'
       }`}
     >
-      <span className="w-8 2xl:w-12 shrink-0 text-sm 2xl:text-lg font-bold tabular-nums text-zinc-400">
+      <span className={`w-8 2xl:w-12 shrink-0 text-sm 2xl:text-lg font-bold tabular-nums ${
+        isEliminated ? 'text-zinc-500' : 'text-zinc-100'
+      }`}>
         #{player.rank}
       </span>
       <span
@@ -243,7 +245,9 @@ function CompactLeaderboardRow({ player, index }: { player: Player; index: numbe
       <span className="ml-auto shrink-0 text-[11px] 2xl:text-sm tabular-nums text-zinc-500">
         {tableLabel}
       </span>
-      <span className="w-12 2xl:w-20 shrink-0 text-right text-sm 2xl:text-lg font-black tabular-nums text-zinc-200">
+      <span className={`w-12 2xl:w-20 shrink-0 text-right text-sm 2xl:text-lg font-black tabular-nums ${
+        isEliminated ? 'text-zinc-500' : 'text-white'
+      }`}>
         {player.score.toLocaleString()}
       </span>
     </motion.div>
