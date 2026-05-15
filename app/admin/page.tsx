@@ -134,7 +134,11 @@ export default function AdminPage() {
     semifinalCutoff: 20,
     finalCutoff: 10,
   });
-  const [activeTab, setActiveTab] = useState<TabType>('participants');
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    if (typeof window === 'undefined') return 'participants';
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tab') === 'scoring' || params.has('table') ? 'scoring' : 'participants';
+  });
   const [showQRCode, setShowQRCode] = useState(false);
   const [showResetWarning, setShowResetWarning] = useState(false);
   const [showPhaseBackWarning, setShowPhaseBackWarning] = useState(false);
@@ -1089,6 +1093,12 @@ export default function AdminPage() {
       <PlayerQRCode 
         isOpen={showQRCode} 
         onClose={() => setShowQRCode(false)} 
+        tables={buildTablesFromParticipants(
+          participants,
+          phaseScores,
+          tournamentState.phase,
+          tournamentState.semifinalPhase
+        )}
       />
 
       {/* Phase Back Warning Dialog */}

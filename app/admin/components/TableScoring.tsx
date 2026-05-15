@@ -86,6 +86,17 @@ export default function TableScoring({
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    if (tables.length === 0 || typeof window === 'undefined') return;
+    const tableParam = new URLSearchParams(window.location.search).get('table');
+    if (!tableParam) return;
+    const tableNumber = Number(tableParam);
+    if (!Number.isInteger(tableNumber)) return;
+    if (tables.some((table) => table.number === tableNumber)) {
+      setSelectedTable(tableNumber);
+    }
+  }, [tables]);
+
   const handleScoreChange = (participantId: string, value: string) => {
     if (participantId.startsWith('dummy-')) return;
     if (!/^\d*$/.test(value)) return;
@@ -158,6 +169,21 @@ export default function TableScoring({
       setScores({});
     }
     setSelectedTable(null);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('table');
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+  };
+
+  const handleSelectTable = (tableNumber: number) => {
+    setSelectedTable(tableNumber);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', 'scoring');
+      url.searchParams.set('table', String(tableNumber));
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    }
   };
 
   const currentTable = selectedTable
@@ -227,7 +253,7 @@ export default function TableScoring({
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.03 }}
-                onClick={() => setSelectedTable(table.number)}
+                onClick={() => handleSelectTable(table.number)}
                 className={`
                   relative group p-4 rounded-2xl border-2 transition-all duration-200
                   ${hasScores
