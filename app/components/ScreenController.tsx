@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Users, Maximize2, Minimize2 } from "lucide-react";
 import LeaderboardScreen from "./LeaderboardScreen";
@@ -13,7 +13,12 @@ function getDisplayScore(score: PlayerScore, currentPhase: number, semifinalPhas
   return score.scores?.[currentPhase]?.points ?? 0;
 }
 
-function convertToPlayers(scores: PlayerScore[], currentPhase: number, semifinalPhase: number): Player[] {
+function convertToPlayers(
+  scores: PlayerScore[],
+  currentPhase: number,
+  semifinalPhase: number,
+  prevRanks: Map<string, number>,
+): Player[] {
   const sortedScores = [...scores].sort((a, b) => {
     const scoreA = getDisplayScore(a, currentPhase, semifinalPhase);
     const scoreB = getDisplayScore(b, currentPhase, semifinalPhase);
@@ -30,6 +35,7 @@ function convertToPlayers(scores: PlayerScore[], currentPhase: number, semifinal
     team: p.team,
     score: getDisplayScore(p, currentPhase, semifinalPhase),
     rank: index + 1,
+    previousRank: prevRanks.get(p.id),
     status: p.status,
     currentTable: p.currentTable,
     currentPhaseScore: p.scores?.[currentPhase]?.points ?? 0,
@@ -106,10 +112,19 @@ export default function ScreenController() {
   }, []);
 
   const displayTables = tables;
+  const prevRanksRef = useRef<Map<string, number>>(new Map());
   const players = useMemo(
-    () => convertToPlayers(playerScores, currentPhase, semifinalPhase),
+    // Ref holds the prior poll's ranks so we can render previousRank diffs;
+    // it is only updated from the effect below, not during render.
+    // eslint-disable-next-line react-hooks/refs
+    () => convertToPlayers(playerScores, currentPhase, semifinalPhase, prevRanksRef.current),
     [currentPhase, playerScores, semifinalPhase]
   );
+  useEffect(() => {
+    const next = new Map<string, number>();
+    for (const p of players) next.set(p.id, p.rank);
+    prevRanksRef.current = next;
+  }, [players]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {

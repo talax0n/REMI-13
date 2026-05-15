@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { Trophy, TrendingUp, TrendingDown, Medal, Award, XCircle, Search, X } from 'lucide-react';
 import { Player } from './types';
 import { getTeamColor } from './team-style';
@@ -192,6 +192,125 @@ function EliminatedRow({ player, index }: { player: Player; index: number }) {
         </span>
       </div>
     </motion.div>
+  );
+}
+
+function CompactLeaderboardRow({ player, index }: { player: Player; index: number }) {
+  const teamStyle = getTeamStyle(player.team);
+  const tableLabel = player.currentTable ? `T${player.currentTable}` : '-';
+  const isEliminated = player.status === 'eliminated' || player.status === 'archived';
+  const moved =
+    typeof player.previousRank === 'number' && player.previousRank !== player.rank;
+  const movedUp = moved && (player.previousRank as number) > player.rank;
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0 }}
+      animate={{
+        opacity: 1,
+        boxShadow: moved
+          ? movedUp
+            ? '0 0 0 1px rgba(16,185,129,0.45), 0 8px 24px -8px rgba(16,185,129,0.35)'
+            : '0 0 0 1px rgba(244,63,94,0.35), 0 8px 24px -8px rgba(244,63,94,0.25)'
+          : '0 0 0 0 rgba(0,0,0,0)',
+      }}
+      transition={{
+        layout: { type: 'spring', stiffness: 320, damping: 32, mass: 0.6 },
+        opacity: { duration: 0.12, delay: Math.min(index * 0.003, 0.2) },
+        boxShadow: { duration: 0.8 },
+      }}
+      className={`flex min-h-0 flex-1 items-center gap-2 2xl:gap-3 rounded-md border px-2 py-1 2xl:px-3 2xl:py-1.5 ${
+        isEliminated
+          ? 'border-white/[0.03] bg-zinc-950/50 opacity-55'
+          : player.rank <= 3
+            ? 'border-yellow-500/20 bg-yellow-500/10'
+            : 'border-white/[0.04] bg-zinc-900/55'
+      }`}
+    >
+      <span className="w-8 2xl:w-12 shrink-0 text-sm 2xl:text-lg font-bold tabular-nums text-zinc-400">
+        #{player.rank}
+      </span>
+      <span
+        className={`truncate text-sm 2xl:text-lg font-semibold ${
+          isEliminated ? 'text-zinc-500 line-through' : 'text-white'
+        }`}
+      >
+        {player.name}
+      </span>
+      <span className={`truncate text-[10px] 2xl:text-xs ${teamStyle.text}`}>{player.team}</span>
+      <RankChange current={player.rank} previous={player.previousRank} />
+      <span className="ml-auto shrink-0 text-[11px] 2xl:text-sm tabular-nums text-zinc-500">
+        {tableLabel}
+      </span>
+      <span className="w-12 2xl:w-20 shrink-0 text-right text-sm 2xl:text-lg font-black tabular-nums text-zinc-200">
+        {player.score.toLocaleString()}
+      </span>
+    </motion.div>
+  );
+}
+
+function useContainerSize<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const rect = entries[0].contentRect;
+      setSize({ w: rect.width, h: rect.height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return { ref, size };
+}
+
+function CompactAllPlayersLayout({ players }: { players: Player[] }) {
+  const { ref, size } = useContainerSize<HTMLDivElement>();
+  const n = players.length;
+
+  // Pick column count so every player fits without scrolling.
+  // Heuristic: each row needs ~36-44px height + 8px gap; each column needs ~240px width.
+  const MIN_ROW_H = 36;
+  const ROW_GAP = 8;
+  const MIN_COL_W = 240;
+  const COL_GAP = 8;
+
+  const availH = size.h || 600;
+  const availW = size.w || 1200;
+
+  const rowsThatFit = Math.max(1, Math.floor((availH + ROW_GAP) / (MIN_ROW_H + ROW_GAP)));
+  const maxColsByWidth = Math.max(1, Math.floor((availW + COL_GAP) / (MIN_COL_W + COL_GAP)));
+
+  const colsNeeded = Math.max(1, Math.ceil(n / rowsThatFit));
+  const cols = Math.max(1, Math.min(maxColsByWidth, colsNeeded));
+  const rowsPerCol = Math.max(1, Math.ceil(n / cols));
+
+  const chunks: Player[][] = Array.from({ length: cols }, (_, ci) =>
+    players.slice(ci * rowsPerCol, (ci + 1) * rowsPerCol),
+  );
+
+  return (
+    <LayoutGroup>
+      <div
+        ref={ref}
+        className="grid flex-1 min-h-0 gap-2 overflow-hidden"
+        style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+      >
+        {chunks.map((chunk, ci) => (
+          <div key={ci} className="flex min-h-0 flex-col gap-1.5 2xl:gap-2">
+            {chunk.map((player, index) => (
+              <CompactLeaderboardRow
+                key={player.id}
+                player={player}
+                index={ci * rowsPerCol + index}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+    </LayoutGroup>
   );
 }
 
@@ -535,14 +654,8 @@ export default function LeaderboardScreen({ players, currentPhase = 1 }: Leaderb
       )}
 
       {/* Normal layout (desktop always; mobile when no query) */}
-      <div className={`${trimmed ? 'hidden sm:flex' : 'flex'} flex-1 flex-col min-h-0 sm:overflow-hidden`}>
-        {currentPhase === 5 ? (
-          <Phase5Layout active={activePlayers} eliminated={eliminatedPlayers} />
-        ) : currentPhase === 6 ? (
-          <Phase6Layout active={activePlayers} eliminated={eliminatedPlayers} />
-        ) : (
-          <DefaultLayout players={players} />
-        )}
+      <div className={`${trimmed ? 'hidden sm:flex' : 'flex'} flex-1 flex-col min-h-0 overflow-hidden`}>
+        <CompactAllPlayersLayout players={isLatePhase ? [...activePlayers, ...eliminatedPlayers] : players} />
       </div>
     </div>
   );
