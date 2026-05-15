@@ -30,7 +30,22 @@ import {
 } from '@/lib/shuffle-engine';
 import { recordTableOpponentHistory } from '@/lib/opponent-history';
 
-function buildTablesFromParticipants(parts: AdminParticipant[]): Table[] {
+function getPhaseAwareScore(
+  participant: AdminParticipant,
+  phaseScores: Record<string, Record<number, number>>,
+  phase: number,
+  semifinalPhase: number
+) {
+  if (phase < semifinalPhase) return participant.score;
+  return phaseScores[participant.id]?.[phase] ?? 0;
+}
+
+function buildTablesFromParticipants(
+  parts: AdminParticipant[],
+  phaseScores: Record<string, Record<number, number>> = {},
+  phase = 1,
+  semifinalPhase = 5
+): Table[] {
   const active = parts.filter((p) => p.status === 'active' && p.tableNumber !== undefined);
   const byTable = new Map<number, AdminParticipant[]>();
   active.forEach((p) => {
@@ -44,12 +59,12 @@ function buildTablesFromParticipants(parts: AdminParticipant[]): Table[] {
       id: `table-${num}`,
       number: num,
       players: [...players]
-        .sort((a, b) => b.score - a.score)
+        .sort((a, b) => getPhaseAwareScore(b, phaseScores, phase, semifinalPhase) - getPhaseAwareScore(a, phaseScores, phase, semifinalPhase))
         .map((p, i): Player => ({
           id: p.id,
           name: p.name,
           team: p.team,
-          score: p.score,
+          score: getPhaseAwareScore(p, phaseScores, phase, semifinalPhase),
           rank: i + 1,
           status: p.status,
         }))
@@ -259,7 +274,11 @@ export default function AdminPage() {
     if (shuffleTargetPhase === tournamentState.finalPhase) {
       const sorted = [...participantsWithCurrentHistory]
         .filter((p) => p.status === 'active')
-        .sort((a, b) => b.score - a.score);
+        .sort(
+          (a, b) =>
+            getPhaseAwareScore(b, phaseScores, tournamentState.semifinalPhase, tournamentState.semifinalPhase)
+            - getPhaseAwareScore(a, phaseScores, tournamentState.semifinalPhase, tournamentState.semifinalPhase)
+        );
 
       const finalists = sorted.slice(0, finalCutoff);
 
@@ -271,7 +290,7 @@ export default function AdminPage() {
         id: p.id,
         name: p.name,
         team: p.team,
-        score: p.score,
+        score: getPhaseAwareScore(p, phaseScores, tournamentState.semifinalPhase, tournamentState.semifinalPhase),
         opponents: new Set(p.opponents ?? []),
       }));
 
@@ -413,7 +432,7 @@ export default function AdminPage() {
 
     setParticipants(updated);
     return { warnings };
-  }, [finalCutoff, participants, semifinalCutoff, shuffleTargetPhase, tournamentState.finalPhase, tournamentState.semifinalPhase]);
+  }, [finalCutoff, participants, phaseScores, semifinalCutoff, shuffleTargetPhase, tournamentState.finalPhase, tournamentState.semifinalPhase]);
 
   // Mark generated phase as active.
   const handlePhaseComplete = useCallback((targetPhase: number) => {
@@ -657,11 +676,13 @@ export default function AdminPage() {
       body: JSON.stringify({ phaseUpdates }),
     }).catch(console.error);
 
-    // 2. Update cumulative scores in admin state using the calculated change
+    // 2. Update cumulative scores in admin state only for regular phases.
+    // Semifinal and final points stay phase-specific in phaseScores.
     setParticipants((prev) =>
       prev.map((p) => {
         const update = updates.find((u) => u.id === p.id);
         if (!update) return p;
+        const isRegularPhase = update.phase < tournamentState.semifinalPhase;
         
         // Calculate the change from previous score for this phase
         const previousScore = phaseScores[update.id]?.[update.phase];
@@ -669,7 +690,7 @@ export default function AdminPage() {
         
         return {
           ...p,
-          score: p.score + scoreChange,
+          score: isRegularPhase ? p.score + scoreChange : p.score,
           matchesPlayed: previousScore === undefined ? p.matchesPlayed + 1 : p.matchesPlayed,
         };
       })
@@ -686,14 +707,19 @@ export default function AdminPage() {
     });
     
     updateTournamentStats();
-  }, [participants, phaseScores, updateTournamentStats]);
+  }, [participants, phaseScores, tournamentState.semifinalPhase, updateTournamentStats]);
 
   // Sync participants to player store and push tables to display whenever participants change.
   // Skipped for the initial DB load (syncEnabled is false at that point).
   useEffect(() => {
     if (!syncEnabled.current) return;
     const sync = async () => {
-      const tables = buildTablesFromParticipants(participants);
+      const tables = buildTablesFromParticipants(
+        participants,
+        phaseScores,
+        tournamentState.phase,
+        tournamentState.semifinalPhase
+      );
       const fetches: Promise<unknown>[] = [
         fetch('/api/player', {
           method: 'POST',
@@ -711,7 +737,7 @@ export default function AdminPage() {
       await Promise.all(fetches);
     };
     sync();
-  }, [participants]);
+  }, [participants, phaseScores, tournamentState.phase, tournamentState.semifinalPhase]);
 
   if (loading) {
     return (
@@ -997,6 +1023,7 @@ export default function AdminPage() {
             <TableScoring
               currentPhase={tournamentState.phase}
               phaseScores={phaseScores}
+              accumulatesScores={tournamentState.phase < tournamentState.semifinalPhase}
               onSaveScores={handleSaveScores}
             />
           )}

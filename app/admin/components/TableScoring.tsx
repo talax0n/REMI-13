@@ -15,6 +15,7 @@ import { PlayerScore } from '../../player/types';
 interface TableScoringProps {
   currentPhase: number;
   phaseScores: Record<string, Record<number, number>>;
+  accumulatesScores?: boolean;
   onSaveScores: (updates: { id: string; score: number; phase: number }[]) => Promise<void>;
 }
 
@@ -22,7 +23,12 @@ function getTeamStyle(team: string) {
   return getTeamColor(team);
 }
 
-export default function TableScoring({ currentPhase = 1, phaseScores, onSaveScores }: TableScoringProps) {
+export default function TableScoring({
+  currentPhase = 1,
+  phaseScores,
+  accumulatesScores = true,
+  onSaveScores,
+}: TableScoringProps) {
   const [tables, setTables] = useState<Table[]>([]);
   const [playerScores, setPlayerScores] = useState<Map<string, number>>(new Map());
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
@@ -358,8 +364,9 @@ export default function TableScoring({ currentPhase = 1, phaseScores, onSaveScor
               typeof pendingPhasePoints === 'number'
                 && pendingPhasePoints !== storedPhasePoints;
             const hasNewScore = effectivePhasePoints !== undefined;
-            const projectedTotal =
-              dbScore - (storedPhasePoints ?? 0) + (effectivePhasePoints ?? 0);
+            const projectedScore = accumulatesScores
+              ? dbScore - (storedPhasePoints ?? 0) + (effectivePhasePoints ?? 0)
+              : effectivePhasePoints ?? storedPhasePoints ?? 0;
             const teamStyle = getTeamStyle(player.team);
             const isDummy = !!player.isDummy;
 
@@ -396,9 +403,11 @@ export default function TableScoring({ currentPhase = 1, phaseScores, onSaveScor
                       {isDummy ? 'Placeholder' : player.team}
                     </span>
                     <div className="mt-2 flex items-center gap-2">
-                      <span className="text-xs text-zinc-500">Saved Total:</span>
+                      <span className="text-xs text-zinc-500">
+                        {accumulatesScores ? 'Saved Total:' : 'Saved Babak:'}
+                      </span>
                       <span className="text-sm font-mono text-zinc-400">
-                        {dbScore.toLocaleString()}
+                        {(accumulatesScores ? dbScore : storedPhasePoints ?? 0).toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -426,9 +435,11 @@ export default function TableScoring({ currentPhase = 1, phaseScores, onSaveScor
                       />
                     </div>
                     <div className="text-right">
-                      <span className="text-xs text-zinc-500">Total </span>
+                      <span className="text-xs text-zinc-500">
+                        {accumulatesScores ? 'Total ' : 'Babak '}
+                      </span>
                       <span className={`text-lg font-black tabular-nums ${hasPendingChange ? 'text-amber-300' : hasNewScore ? 'text-emerald-400' : 'text-zinc-400'}`}>
-                        {projectedTotal.toLocaleString()}
+                        {projectedScore.toLocaleString()}
                       </span>
                     </div>
                   </div>
