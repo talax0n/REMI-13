@@ -231,9 +231,13 @@ function CompactLeaderboardRow({ player, index }: { player: Player; index: numbe
       className={`flex min-h-0 flex-1 items-center gap-2 2xl:gap-3 rounded-md border px-2 py-1 2xl:px-3 2xl:py-1.5 ${
         isEliminated
           ? 'border-white/[0.03] bg-zinc-950/50 opacity-55'
-          : player.rank <= 20
-            ? 'border-yellow-500/20 bg-yellow-500/10'
-            : 'border-white/[0.04] bg-zinc-900/55'
+          : player.rank <= 3
+            ? 'border-yellow-400/50 bg-yellow-500/20'
+            : player.rank <= 10
+              ? 'border-amber-500/30 bg-amber-500/12'
+              : player.rank <= 20
+                ? 'border-yellow-500/15 bg-yellow-500/[0.06]'
+                : 'border-white/[0.04] bg-zinc-900/55'
       }`}
     >
       <span className={`w-8 2xl:w-12 shrink-0 text-sm 2xl:text-lg font-bold tabular-nums ${
