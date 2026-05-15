@@ -57,6 +57,13 @@ function RankBadge({ rank }: { rank: number }) {
       </div>
     );
   }
+  if (rank <= 20) {
+    return (
+      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-yellow-500/20 border border-yellow-500/40 flex items-center justify-center text-sm sm:text-base font-bold text-yellow-300">
+        {rank}
+      </div>
+    );
+  }
   return (
     <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-zinc-800 flex items-center justify-center text-sm sm:text-base font-bold text-white">
       {rank}
@@ -114,6 +121,7 @@ function TopTenPlayer({ player, index }: { player: Player; index: number }) {
 function PlayerRow({ player, index }: { player: Player; index: number }) {
   const teamStyle = getTeamStyle(player.team);
   const tableLabel = player.currentTable ? `T${player.currentTable}` : '-';
+  const isTop20 = player.rank <= 20;
 
   return (
     <motion.div
@@ -121,9 +129,9 @@ function PlayerRow({ player, index }: { player: Player; index: number }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.15, delay: Math.min(index * 0.005, 0.5) }}
-      className="flex items-center gap-2 px-2 py-1.5 sm:py-2 hover:bg-white/[0.03] transition-colors border-b border-white/[0.03]"
+      className={`flex items-center gap-2 px-2 py-1.5 sm:py-2 hover:bg-white/[0.03] transition-colors border-b border-white/[0.03] ${isTop20 ? 'bg-yellow-500/5' : ''}`}
     >
-      <div className="w-6 h-6 sm:w-8 sm:h-8 shrink-0 rounded flex items-center justify-center text-xs sm:text-sm font-bold text-zinc-500">
+      <div className={`w-6 h-6 sm:w-8 sm:h-8 shrink-0 rounded flex items-center justify-center text-xs sm:text-sm font-bold ${isTop20 ? 'bg-yellow-500/20 border border-yellow-500/40 text-yellow-300' : 'text-zinc-500'}`}>
         {player.rank}
       </div>
 
