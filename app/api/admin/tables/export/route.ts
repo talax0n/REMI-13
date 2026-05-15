@@ -11,6 +11,7 @@ interface TournamentStateRow {
 }
 
 const XLSX_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const SCORE_SHEET_SHUFFLES = 7;
 
 function safeFilenamePart(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -38,6 +39,25 @@ function styleHeaderRow(row: ExcelJS.Row) {
     fgColor: { argb: 'FF18181B' },
   };
   row.alignment = { horizontal: 'center', vertical: 'middle' };
+}
+
+function styleScoreHeaderCell(cell: ExcelJS.Cell, fontSize = 11) {
+  cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: fontSize };
+  cell.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF18181B' },
+  };
+  cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+}
+
+function setThinBlackBorder(cell: ExcelJS.Cell) {
+  cell.border = {
+    top: { style: 'thin', color: { argb: 'FF000000' } },
+    left: { style: 'thin', color: { argb: 'FF000000' } },
+    bottom: { style: 'thin', color: { argb: 'FF000000' } },
+    right: { style: 'thin', color: { argb: 'FF000000' } },
+  };
 }
 
 function styleTableBorders(worksheet: ExcelJS.Worksheet, fromRow: number, toRow: number, columnCount: number) {
@@ -80,7 +100,7 @@ function addPairingSheet(
         footer: 0.2,
       },
     },
-    views: [{ state: 'frozen', ySplit: 4 }],
+    views: [{ state: 'frozen', ySplit: 3, topLeftCell: 'A4', activeCell: 'A4' }],
   });
 
   worksheet.columns = [
@@ -131,6 +151,95 @@ function addPairingSheet(
   return worksheet;
 }
 
+function addTableScoreSheet(
+  workbook: ExcelJS.Workbook,
+  sheetName: string,
+  phase: number,
+  generatedAt: string,
+  table: Awaited<ReturnType<typeof getPrintableTablePairings>>[number]
+) {
+  const worksheet = workbook.addWorksheet(sheetName, {
+    pageSetup: {
+      paperSize: 9,
+      orientation: 'landscape',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 1,
+      margins: {
+        left: 0.25,
+        right: 0.25,
+        top: 0.35,
+        bottom: 0.35,
+        header: 0.2,
+        footer: 0.2,
+      },
+    },
+    views: [{ state: 'frozen', ySplit: 4, topLeftCell: 'A5', activeCell: 'A5', showGridLines: true }],
+  });
+
+  worksheet.columns = [
+    { key: 'table', width: 8 },
+    { key: 'shuffle', width: 10 },
+    { key: 'player1', width: 22 },
+    { key: 'player2', width: 22 },
+    { key: 'player3', width: 22 },
+    { key: 'player4', width: 22 },
+    { key: 'player5', width: 22 },
+  ];
+
+  worksheet.mergeCells('A1:G1');
+  worksheet.mergeCells('A2:G2');
+  worksheet.getCell('A1').value = 'Remi 13 - Table Pairings';
+  worksheet.getCell('A2').value = `Phase ${phase} • Generated ${generatedAt}`;
+
+  worksheet.getRow(1).height = 28;
+  worksheet.getRow(2).height = 24;
+  worksheet.getCell('A1').font = { bold: true, size: 18 };
+  worksheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getCell('A2').font = { bold: true, size: 12 };
+  worksheet.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' };
+
+  const players = table.players.slice(0, 5);
+  const headerRow = worksheet.getRow(3);
+  headerRow.values = ['Table', 'Shuffle', ...players.map((player) => player.name)];
+  headerRow.height = 22;
+  const teamRow = worksheet.getRow(4);
+  teamRow.values = ['', '', ...players.map((player) => player.team)];
+  teamRow.height = 18;
+
+  for (let column = 1; column <= 7; column += 1) {
+    styleScoreHeaderCell(headerRow.getCell(column), column <= 2 ? 11 : 12);
+    styleScoreHeaderCell(teamRow.getCell(column), 8);
+  }
+  worksheet.mergeCells('A3:A4');
+  worksheet.mergeCells('B3:B4');
+
+  for (let i = 0; i < SCORE_SHEET_SHUFFLES; i += 1) {
+    const row = worksheet.getRow(5 + i);
+    row.values = [table.number, i + 1, '', '', '', '', ''];
+    row.height = 22;
+    row.alignment = { horizontal: 'center', vertical: 'middle' };
+  }
+
+  worksheet.getRow(12).height = 22;
+  worksheet.mergeCells('A13:B13');
+  const totalRow = worksheet.getRow(13);
+  totalRow.height = 22;
+  worksheet.getCell('A13').value = 'Total Score';
+  worksheet.getCell('A13').font = { bold: true, size: 12 };
+  worksheet.getCell('A13').alignment = { horizontal: 'center', vertical: 'middle' };
+
+  for (let row = 3; row <= 13; row += 1) {
+    for (let column = 1; column <= 7; column += 1) {
+      const cell = worksheet.getRow(row).getCell(column);
+      setThinBlackBorder(cell);
+      cell.alignment = cell.alignment ?? { horizontal: 'center', vertical: 'middle' };
+    }
+  }
+
+  return worksheet;
+}
+
 export async function GET() {
   const [tables, stateRows] = await Promise.all([
     getPrintableTablePairings(),
@@ -157,14 +266,12 @@ export async function GET() {
   );
 
   tables.forEach((table) => {
-    addPairingSheet(
+    addTableScoreSheet(
       workbook,
       `Table ${table.number}`,
-      `Remi 13 - Table ${table.number} Score Sheet`,
       phase,
       generatedAt,
-      tables,
-      table.number
+      table
     );
   });
 
