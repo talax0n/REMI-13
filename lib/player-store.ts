@@ -110,7 +110,7 @@ export async function updatePlayerPhaseScore(
           scores = scores || jsonb_build_object($1::text, $2::jsonb),
          updated_at = NOW()
      WHERE id = $3`,
-    [String(phase), JSON.stringify(phaseScore), playerId, points]
+    [String(phase), JSON.stringify(phaseScore), playerId]
   );
 }
 
