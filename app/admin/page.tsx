@@ -461,6 +461,7 @@ export default function AdminPage() {
     setParticipants((prev) =>
       prev.map((p) => ({ ...p, score: 0, matchesPlayed: 0 }))
     );
+    setPhaseScores({});
     // Clear phase scores via API
     await fetch('/api/player', {
       method: 'POST',

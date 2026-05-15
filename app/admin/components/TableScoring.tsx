@@ -41,6 +41,15 @@ export default function TableScoring({ currentPhase = 1, phaseScores, onSaveScor
     setScores({});
   }, [currentPhase]);
 
+  // Drop pending edits if the underlying stored scores were wiped
+  // (e.g. admin pressed "Reset All Scores") so stale entries don't
+  // resurrect numbers the user just cleared.
+  useEffect(() => {
+    if (Object.keys(phaseScores).length === 0) {
+      setScores({});
+    }
+  }, [phaseScores]);
+
   const hasChanges = Object.entries(scores).some(
     ([id, value]) => typeof value === 'number' && value !== getStoredPhasePoints(id)
   );
