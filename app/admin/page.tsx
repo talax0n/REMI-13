@@ -155,6 +155,8 @@ export default function AdminPage() {
   // The sync useEffect must not fire for that first setParticipants call —
   // the DB already has correct state; syncing would unnecessarily overwrite tables.
   const syncEnabled = useRef(false);
+  const lastLocalMutationAt = useRef(0);
+  const isPollingRef = useRef(false);
 
   const teams = useMemo(() => extractTeams(participants), [participants]);
   const seatedActiveParticipants = useMemo(
@@ -198,16 +200,28 @@ export default function AdminPage() {
     }).catch(console.error);
   }, [finalCutoff, semifinalCutoff]);
 
+  // Apply server state without re-triggering the local sync push effect.
+  const applyServerState = useCallback((data: {
+    participants: AdminParticipant[];
+    tournamentState: TournamentState;
+    phaseScores?: Record<string, Record<number, number>>;
+  }) => {
+    const wasEnabled = syncEnabled.current;
+    syncEnabled.current = false;
+    setParticipants(data.participants);
+    setTournamentState(data.tournamentState);
+    setPhaseScores(data.phaseScores ?? {});
+    setSemifinalCutoff(data.tournamentState.semifinalCutoff ?? 20);
+    setFinalCutoff(data.tournamentState.finalCutoff ?? 10);
+    requestAnimationFrame(() => { syncEnabled.current = wasEnabled; });
+  }, []);
+
   // Load state from DB on mount
   useEffect(() => {
     fetch('/api/admin')
       .then((r) => r.json())
       .then((data) => {
-        setParticipants(data.participants);
-        setTournamentState(data.tournamentState);
-        setPhaseScores(data.phaseScores ?? {});
-        setSemifinalCutoff(data.tournamentState.semifinalCutoff ?? 20);
-        setFinalCutoff(data.tournamentState.finalCutoff ?? 10);
+        applyServerState(data);
         // Enable syncing only AFTER the initial load settles.
         // requestAnimationFrame ensures the participants useEffect triggered by
         // setParticipants above has already fired (and been skipped) before we
@@ -216,7 +230,47 @@ export default function AdminPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [applyServerState]);
+
+  // Poll /api/admin so changes from other admin clients propagate without a manual refresh.
+  // Skipped when the tab is hidden, when a poll is already in flight, or when a local
+  // mutation fired recently (the local change is still being pushed up and pulling now
+  // would race against it).
+  useEffect(() => {
+    const POLL_MS = 5000;
+    const MUTATION_COOLDOWN_MS = 2500;
+
+    const refresh = async () => {
+      if (isPollingRef.current) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
+      if (Date.now() - lastLocalMutationAt.current < MUTATION_COOLDOWN_MS) return;
+      isPollingRef.current = true;
+      try {
+        const res = await fetch('/api/admin', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Date.now() - lastLocalMutationAt.current < MUTATION_COOLDOWN_MS) return;
+        applyServerState(data);
+      } catch {
+        // ignore transient errors
+      } finally {
+        isPollingRef.current = false;
+      }
+    };
+
+    const interval = setInterval(refresh, POLL_MS);
+    const onVisibility = () => {
+      if (!document.hidden) refresh();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', refresh);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [applyServerState]);
 
   // Update tournament stats
   const updateTournamentStats = useCallback(() => {
@@ -726,6 +780,7 @@ export default function AdminPage() {
   // Skipped for the initial DB load (syncEnabled is false at that point).
   useEffect(() => {
     if (!syncEnabled.current) return;
+    lastLocalMutationAt.current = Date.now();
     const sync = async () => {
       const tables = buildTablesFromParticipants(
         participants,
