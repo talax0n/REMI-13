@@ -136,6 +136,9 @@ export async function syncFromAdminParticipants(
 ): Promise<void> {
   if (adminParticipants.length === 0) return;
 
+  // Identity + assignment fields only. total_score, matches_played, and scores
+  // are owned by updatePlayerPhaseScore so a roster sync from the admin client
+  // can never overwrite a recorded score with a stale cached value.
   const placeholders = adminParticipants
     .map((_, i) => {
       const b = i * 8;
@@ -160,11 +163,9 @@ export async function syncFromAdminParticipants(
      ON CONFLICT (id) DO UPDATE SET
        name = EXCLUDED.name,
        team = EXCLUDED.team,
-       total_score = EXCLUDED.total_score,
        status = EXCLUDED.status,
        current_table = EXCLUDED.current_table,
        opponents = EXCLUDED.opponents,
-       matches_played = EXCLUDED.matches_played,
        updated_at = NOW()`,
     params
   );
