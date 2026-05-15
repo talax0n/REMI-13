@@ -75,6 +75,15 @@ export async function deletePlayer(playerId: string): Promise<void> {
   await query('DELETE FROM players WHERE id = $1', [playerId]);
 }
 
+export async function deletePlayers(playerIds: string[]): Promise<number> {
+  if (playerIds.length === 0) return 0;
+  const rows = await query<{ id: string }>(
+    'DELETE FROM players WHERE id = ANY($1::text[]) RETURNING id',
+    [playerIds]
+  );
+  return rows.length;
+}
+
 export async function updatePlayerPhaseScore(
   playerId: string,
   phase: number,

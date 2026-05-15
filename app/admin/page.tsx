@@ -589,26 +589,25 @@ export default function AdminPage() {
   const handleDeleteParticipants = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return;
 
-    const results = await Promise.all(
-      ids.map((id) =>
-        fetch(`/api/admin/player?id=${encodeURIComponent(id)}`, {
-          method: 'DELETE',
-        })
-      )
-    );
-    const failedCount = results.filter((response) => !response.ok).length;
+    const response = await fetch('/api/admin/player', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
 
-    if (failedCount > 0) {
-      toast.error('Failed to delete some participants', {
-        description: `${failedCount} participant${failedCount === 1 ? '' : 's'} could not be deleted.`,
+    if (!response.ok) {
+      toast.error('Failed to delete participants', {
+        description: `${ids.length} participant${ids.length === 1 ? '' : 's'} could not be deleted.`,
       });
+      return;
     }
 
-    const deletedIds = new Set(
-      ids.filter((_, index) => results[index]?.ok)
-    );
-    if (deletedIds.size === 0) return;
+    const payload = (await response.json().catch(() => null)) as
+      | { deleted?: number }
+      | null;
+    const deletedCount = typeof payload?.deleted === 'number' ? payload.deleted : ids.length;
 
+    const deletedIds = new Set(ids);
     const nextParticipants = participants.filter((p) => !deletedIds.has(p.id));
     const activeCount = nextParticipants.filter((p) => p.status === 'active').length;
     setParticipants(nextParticipants);
@@ -618,7 +617,7 @@ export default function AdminPage() {
       totalTables: Math.ceil(activeCount / 5),
     }));
     toast.success(
-      deletedIds.size === 1 ? 'Participant deleted' : `${deletedIds.size} participants deleted`
+      deletedCount === 1 ? 'Participant deleted' : `${deletedCount} participants deleted`
     );
   }, [participants]);
 
