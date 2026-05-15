@@ -32,7 +32,7 @@ export default function TableScoring({
   const [tables, setTables] = useState<Table[]>([]);
   const [playerScores, setPlayerScores] = useState<Map<string, number>>(new Map());
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
-  const [scores, setScores] = useState<Record<string, number | null>>({});
+  const [scores, setScores] = useState<Record<string, number | null | '-'>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -99,13 +99,21 @@ export default function TableScoring({
 
   const handleScoreChange = (participantId: string, value: string) => {
     if (participantId.startsWith('dummy-')) return;
-    if (!/^\d*$/.test(value)) return;
-    if (value === '') {
+    const normalizedValue = value.replace('−', '-');
+    const nextValue = normalizedValue.endsWith('-') && !normalizedValue.startsWith('-')
+      ? '-'
+      : normalizedValue;
+    if (!/^-?\d*$/.test(nextValue)) return;
+    if (nextValue === '') {
       setScores((prev) => ({ ...prev, [participantId]: null }));
       return;
     }
-    const numValue = Number(value);
-    if (Number.isNaN(numValue) || numValue < 0) return;
+    if (nextValue === '-') {
+      setScores((prev) => ({ ...prev, [participantId]: '-' }));
+      return;
+    }
+    const numValue = Number(nextValue);
+    if (Number.isNaN(numValue)) return;
     setScores((prev) => ({ ...prev, [participantId]: numValue }));
   };
 
@@ -444,10 +452,11 @@ export default function TableScoring({
                       <span className="text-xs text-zinc-500">Babak {currentPhase}</span>
                       <Input
                         type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
+                        inputMode="text"
+                        pattern="-?[0-9]*"
                         autoComplete="off"
                         value={inputValue}
+                        onFocus={(e: React.FocusEvent<HTMLInputElement>) => e.currentTarget.select()}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                           handleScoreChange(player.id, e.target.value)
                         }
