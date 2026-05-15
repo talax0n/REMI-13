@@ -255,6 +255,16 @@ export default function AdminPage() {
       }));
       const nextParticipants = [...participants, ...participantsWithIds];
       const activeCount = nextParticipants.filter((p) => p.status === 'active').length;
+      const response = await fetch('/api/player', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participants: nextParticipants }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save imported participants');
+      }
+
       setParticipants(nextParticipants);
       setTournamentState((prev) => ({
         ...prev,
