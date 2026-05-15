@@ -8,9 +8,16 @@ import TablesScreen from "./TablesScreen";
 import { ScreenType, Player, Table } from "./types";
 import { PlayerScore } from "../player/types";
 
-function convertToPlayers(scores: PlayerScore[], currentPhase: number): Player[] {
+function getDisplayScore(score: PlayerScore, currentPhase: number, semifinalPhase: number) {
+  if (currentPhase < semifinalPhase) return score.totalScore;
+  return score.scores?.[currentPhase]?.points ?? 0;
+}
+
+function convertToPlayers(scores: PlayerScore[], currentPhase: number, semifinalPhase: number): Player[] {
   const sortedScores = [...scores].sort((a, b) => {
-    if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+    const scoreA = getDisplayScore(a, currentPhase, semifinalPhase);
+    const scoreB = getDisplayScore(b, currentPhase, semifinalPhase);
+    if (scoreB !== scoreA) return scoreB - scoreA;
     const tableA = a.currentTable ?? Number.MAX_SAFE_INTEGER;
     const tableB = b.currentTable ?? Number.MAX_SAFE_INTEGER;
     if (tableA !== tableB) return tableA - tableB;
@@ -21,7 +28,7 @@ function convertToPlayers(scores: PlayerScore[], currentPhase: number): Player[]
     id: p.id,
     name: p.name,
     team: p.team,
-    score: p.totalScore,
+    score: getDisplayScore(p, currentPhase, semifinalPhase),
     rank: index + 1,
     status: p.status,
     currentTable: p.currentTable,
@@ -35,6 +42,7 @@ export default function ScreenController() {
   const [playerScores, setPlayerScores] = useState<PlayerScore[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [currentPhase, setCurrentPhase] = useState(1);
+  const [semifinalPhase, setSemifinalPhase] = useState(5);
 
   // Fetch current tournament phase on mount, then poll every 5s
   useEffect(() => {
@@ -45,6 +53,7 @@ export default function ScreenController() {
         const data = await res.json();
         if (!cancelled && data.tournamentState?.phase) {
           setCurrentPhase(data.tournamentState.phase);
+          setSemifinalPhase(data.tournamentState.semifinalPhase ?? 5);
         }
       } catch {
         // ignore
@@ -89,8 +98,8 @@ export default function ScreenController() {
 
   const displayTables = tables;
   const players = useMemo(
-    () => convertToPlayers(playerScores, currentPhase),
-    [currentPhase, playerScores]
+    () => convertToPlayers(playerScores, currentPhase, semifinalPhase),
+    [currentPhase, playerScores, semifinalPhase]
   );
 
   const toggleFullscreen = () => {
