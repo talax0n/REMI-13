@@ -2,12 +2,20 @@ import { toPng } from 'html-to-image';
 
 export async function captureLeaderboardSnapshot(opts: {
   phase: number;
+  players?: number;
   width?: number;
   height?: number;
   settleMs?: number;
 }): Promise<void> {
   const width = opts.width ?? 1280;
-  const height = opts.height ?? 1800;
+  // Auto-scale height with player count. Leaderboard packs into columns based
+  // on container size; widen the canvas so cells stay readable past ~150.
+  const players = opts.players ?? 0;
+  const colsAtBase = 4;
+  const rowH = 56;
+  const headerH = 240;
+  const autoHeight = Math.ceil(players / colsAtBase) * rowH + headerH;
+  const height = opts.height ?? Math.max(1800, autoHeight);
   const settleMs = opts.settleMs ?? 2200;
 
   const iframe = document.createElement('iframe');

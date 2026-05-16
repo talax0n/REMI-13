@@ -103,7 +103,10 @@ export default function ShuffleControl({
   const snapshotLeaderboard = async () => {
     toast.loading('Menyimpan foto leaderboard...', { id: 'shuffle' });
     try {
-      await captureLeaderboardSnapshot({ phase: state.phase });
+      await captureLeaderboardSnapshot({
+        phase: state.phase,
+        players: state.totalParticipants,
+      });
     } catch (error) {
       toast.warning('Gagal menyimpan foto leaderboard', {
         description: error instanceof Error ? error.message : 'Lanjut shuffle tanpa snapshot.',
