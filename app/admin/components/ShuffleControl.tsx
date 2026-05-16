@@ -16,6 +16,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { TournamentState } from '../types';
 import type { ShuffleOptions, ShuffleResult, ShuffleTiebreakInfo } from '../page';
+import { captureLeaderboardSnapshot } from '../lib/leaderboard-snapshot';
 import { toast } from 'sonner';
 
 interface ShuffleControlProps {
@@ -99,6 +100,17 @@ export default function ShuffleControl({
     onPhaseComplete(targetPhase);
   };
 
+  const snapshotLeaderboard = async () => {
+    toast.loading('Menyimpan foto leaderboard...', { id: 'shuffle' });
+    try {
+      await captureLeaderboardSnapshot({ phase: state.phase });
+    } catch (error) {
+      toast.warning('Gagal menyimpan foto leaderboard', {
+        description: error instanceof Error ? error.message : 'Lanjut shuffle tanpa snapshot.',
+      });
+    }
+  };
+
   const runShuffle = async (resolved: Record<string, string[]>) => {
     toast.loading('Generating tables...', { id: 'shuffle' });
     setIsShuffling(true);
@@ -125,6 +137,7 @@ export default function ShuffleControl({
   const handleConfirmShuffle = async () => {
     setIsDialogOpen(false);
     setResolvedTiebreakers({});
+    await snapshotLeaderboard();
     await runShuffle({});
   };
 

@@ -1322,7 +1322,7 @@ export default function AdminPage() {
               Bulk Import
             </DialogTitle>
             <DialogDescription className="text-zinc-400">
-              Upload a CSV or XLSX file with columns: name, team.
+              Upload a CSV or XLSX file with columns: name, team, status (paid / unpaid, optional — defaults to paid).
             </DialogDescription>
           </DialogHeader>
           <BulkImportUploader

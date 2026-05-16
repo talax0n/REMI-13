@@ -44,4 +44,6 @@ export interface ImportValidation {
 export interface ParticipantImportRow {
   name: string;
   team: string;
+  status: 'active' | 'inactive';
+  statusRaw?: string;
 }

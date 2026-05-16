@@ -42,16 +42,23 @@ export default function BulkImportUploader({ existingParticipants, onImport, bar
       errors.push('No participant rows found');
     }
 
+    const validStatusValues = new Set(['', 'paid', 'unpaid', 'active', 'inactive', 'lunas', 'belum', 'belum bayar', 'sudah bayar']);
+
     data.forEach((row, index) => {
       const rowNum = index + 2;
-      
+
       if (!row.name) {
         missingFields.push(`Row ${rowNum}: Missing name`);
       }
       if (!row.team) {
         missingFields.push(`Row ${rowNum}: Missing team`);
       }
-      
+
+      const rawStatus = (row.statusRaw ?? '').trim().toLowerCase();
+      if (rawStatus && !validStatusValues.has(rawStatus)) {
+        errors.push(`Row ${rowNum}: Unknown status "${row.statusRaw}" — use paid or unpaid`);
+      }
+
       const key = `${row.name.toLowerCase()}::${row.team.toLowerCase()}`;
       if (row.name && row.team && existingKeys.has(key)) {
         duplicates.push(`${row.name} (${row.team})`);
@@ -132,7 +139,7 @@ export default function BulkImportUploader({ existingParticipants, onImport, bar
         team: row.team,
         score: 0,
         matchesPlayed: 0,
-        status: 'active' as const,
+        status: row.status,
       }));
 
       await onImport(participants);
@@ -184,7 +191,7 @@ export default function BulkImportUploader({ existingParticipants, onImport, bar
                       Drop CSV or XLSX file here or click to upload
                     </p>
                     <p className="text-sm text-zinc-500">
-                      Required columns: name, team
+                      Required: name, team. Optional: status (paid / unpaid)
                     </p>
                   </label>
                 </div>
@@ -252,6 +259,7 @@ export default function BulkImportUploader({ existingParticipants, onImport, bar
                       <TableRow className="border-white/10">
                         <TableHead className="text-zinc-300">Name</TableHead>
                         <TableHead className="text-zinc-300">Team</TableHead>
+                        <TableHead className="text-zinc-300">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -259,6 +267,18 @@ export default function BulkImportUploader({ existingParticipants, onImport, bar
                         <TableRow key={index} className="border-white/5">
                           <TableCell className="text-white">{row.name}</TableCell>
                           <TableCell className="text-zinc-400">{row.team}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="secondary"
+                              className={
+                                row.status === 'active'
+                                  ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                                  : 'bg-zinc-700/60 text-zinc-300 border border-white/10'
+                              }
+                            >
+                              {row.status === 'active' ? 'Paid' : 'Unpaid'}
+                            </Badge>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

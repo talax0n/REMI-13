@@ -35,6 +35,18 @@ function splitCsvLine(line: string): string[] {
   return values;
 }
 
+function parseStatus(raw: string): { status: 'active' | 'inactive'; raw: string } {
+  const v = raw.trim().toLowerCase();
+  if (!v) return { status: 'active', raw: '' };
+  if (v === 'paid' || v === 'active' || v === 'lunas' || v === 'sudah bayar') {
+    return { status: 'active', raw };
+  }
+  if (v === 'unpaid' || v === 'inactive' || v === 'belum' || v === 'belum bayar') {
+    return { status: 'inactive', raw };
+  }
+  return { status: 'active', raw };
+}
+
 function rowsFromValues(values: unknown[][]): ParticipantImportRow[] {
   const [headerRow, ...bodyRows] = values;
   if (!headerRow) return [];
@@ -44,16 +56,23 @@ function rowsFromValues(values: unknown[][]): ParticipantImportRow[] {
   const teamIndex = headers.indexOf('team');
   const legacyChurchIndex = headers.indexOf('church');
   const groupingIndex = teamIndex !== -1 ? teamIndex : legacyChurchIndex;
+  const statusIndex = headers.indexOf('status');
 
   if (nameIndex === -1 || groupingIndex === -1) {
     throw new Error('File must have "name" and "team" columns');
   }
 
   return bodyRows
-    .map((row) => ({
-      name: String(row[nameIndex] ?? '').trim(),
-      team: String(row[groupingIndex] ?? '').trim(),
-    }))
+    .map((row) => {
+      const rawStatus = statusIndex !== -1 ? String(row[statusIndex] ?? '') : '';
+      const parsed = parseStatus(rawStatus);
+      return {
+        name: String(row[nameIndex] ?? '').trim(),
+        team: String(row[groupingIndex] ?? '').trim(),
+        status: parsed.status,
+        statusRaw: parsed.raw,
+      };
+    })
     .filter((row) => row.name || row.team);
 }
 
