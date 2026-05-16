@@ -51,7 +51,7 @@ export async function getPlayerScores(): Promise<PlayerScore[]> {
 export async function getLeaderboard(): Promise<PlayerScore[]> {
   const rows = await query<PlayerRow>(
     `SELECT * FROM players
-     WHERE status NOT IN ('archived', 'inactive')
+     WHERE status NOT IN ('archived', 'inactive', 'eliminated')
      ORDER BY total_score DESC, current_table ASC NULLS LAST, name ASC`
   );
   return rows.map(rowToPlayerScore);
@@ -111,6 +111,28 @@ export async function updatePlayerPhaseScore(
          updated_at = NOW()
      WHERE id = $3`,
     [String(phase), JSON.stringify(phaseScore), playerId]
+  );
+}
+
+// Strip a single phase entry from every player's scores jsonb, decrement
+// matches_played for players that had a score for that phase, and recompute
+// total_score from the remaining regular-phase entries. Used by phase-back
+// to fully roll back a phase.
+export async function wipePhaseScores(phase: number): Promise<void> {
+  await query(
+    `UPDATE players
+     SET matches_played = GREATEST(0, matches_played - CASE WHEN scores ? $1::text THEN 1 ELSE 0 END),
+         total_score = (
+           SELECT COALESCE(SUM((phase_entry.value ->> 'points')::integer), 0)::integer
+           FROM jsonb_each(scores - $1::text) AS phase_entry(key, value)
+           WHERE phase_entry.key::integer < COALESCE(
+             (SELECT semifinal_phase FROM tournament_state WHERE id = 1),
+             5
+           )
+         ),
+         scores = scores - $1::text,
+         updated_at = NOW()`,
+    [String(phase)]
   );
 }
 

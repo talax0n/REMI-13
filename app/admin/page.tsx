@@ -618,32 +618,81 @@ export default function AdminPage() {
     });
   }, [persistTournamentState]);
 
-  // Go back to previous phase
-  const handlePhaseBack = useCallback(() => {
+  // Full rollback to previous phase: wipe phase X scores (DB + state), subtract
+  // their cumulative contribution from p.score, clear table assignments, and
+  // restore players eliminated by a shuffle at phase X or later.
+  const handlePhaseBack = useCallback(async () => {
+    const wipedPhase = tournamentState.phase;
+    if (wipedPhase <= 1) {
+      setShowPhaseBackWarning(false);
+      return;
+    }
+    const newPhase = wipedPhase - 1;
+
+    // Block polling overwrite while the wipe is in flight.
+    lastLocalMutationAt.current = Date.now();
+    isSyncingRef.current = true;
+    try {
+      await fetch('/api/player', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wipePhase: wipedPhase }),
+      }).catch(console.error);
+      await fetch('/api/tables', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([]),
+      }).catch(console.error);
+    } finally {
+      lastLocalMutationAt.current = Date.now();
+      isSyncingRef.current = false;
+    }
+
     setTournamentState((prev) => {
-      const newPhase = Math.max(1, prev.phase - 1);
       const next = {
         ...prev,
         phase: newPhase,
         status: 'waiting' as TournamentState['status'],
-        isFinalPhase: false,
+        isFinalPhase: newPhase >= prev.finalPhase,
       };
       persistTournamentState(next);
       return next;
     });
-    // Restore players that were eliminated at or after the phase we're going back to
-    setParticipants((prev) => {
-      const newPhase = Math.max(1, tournamentState.phase - 1);
-      return prev.map((p) => {
-        if (p.status === 'eliminated' && (p.eliminatedAtPhase ?? 0) >= newPhase) {
-          const { eliminatedAtPhase: _, ...rest } = p;
-          return { ...rest, status: 'active' as const, tableNumber: undefined };
+
+    setPhaseScores((prev) => {
+      const next: Record<string, Record<number, number>> = {};
+      for (const [pid, byPhase] of Object.entries(prev)) {
+        const filtered: Record<number, number> = {};
+        for (const [ph, score] of Object.entries(byPhase)) {
+          const phaseNum = Number(ph);
+          if (phaseNum !== wipedPhase) filtered[phaseNum] = score;
         }
-        return p;
-      });
+        next[pid] = filtered;
+      }
+      return next;
     });
+
+    const isRegularPhase = wipedPhase < tournamentState.semifinalPhase;
+    setParticipants((prev) => prev.map((p) => {
+      const wipedScore = phaseScores[p.id]?.[wipedPhase];
+      const hadScore = wipedScore !== undefined;
+
+      let next: AdminParticipant = { ...p, tableNumber: undefined };
+      if (isRegularPhase && hadScore) {
+        next.score = Math.max(0, p.score - wipedScore);
+        next.matchesPlayed = Math.max(0, p.matchesPlayed - 1);
+      }
+
+      // Restore players eliminated by a shuffle into wipedPhase or later.
+      if (next.status === 'eliminated' && (next.eliminatedAtPhase ?? 0) >= newPhase) {
+        const { eliminatedAtPhase: _eliminated, ...rest } = next;
+        next = { ...rest, status: 'active' as const };
+      }
+      return next;
+    }));
+
     setShowPhaseBackWarning(false);
-  }, [persistTournamentState, tournamentState.phase]);
+  }, [persistTournamentState, phaseScores, tournamentState.phase, tournamentState.semifinalPhase]);
 
   // Reset all scores (set all participant scores to 0)
   const handleResetAllScores = useCallback(async () => {

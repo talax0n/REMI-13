@@ -7,6 +7,7 @@ import {
   syncFromAdminParticipants,
   resetAllPlayerScores,
   updatePlayerPhaseScore,
+  wipePhaseScores,
 } from '@/lib/player-store';
 
 export async function GET(request: Request) {
@@ -49,6 +50,11 @@ export async function POST(request: Request) {
   if (body.resetScores) {
     await resetAllPlayerScores();
     return Response.json({ ok: true });
+  }
+
+  if (typeof body.wipePhase === 'number' && Number.isFinite(body.wipePhase)) {
+    await wipePhaseScores(body.wipePhase);
+    return Response.json({ ok: true, phase: body.wipePhase });
   }
 
   return Response.json({ error: 'Invalid request' }, { status: 400 });

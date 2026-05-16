@@ -554,12 +554,13 @@ export default function LeaderboardScreen({ players, currentPhase = 1 }: Leaderb
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
 
+  // Eliminated players are excluded from the leaderboard entirely (no "Gugur"
+  // section). The API already filters them out, but guard here in case stale
+  // rows leak through during a phase transition.
+  const visiblePlayers = players.filter((player) => player.status !== 'eliminated');
   const activePlayers = isLatePhase
-    ? players.filter((player) => player.status === 'active' || player.status === 'winner')
-    : players;
-  const eliminatedPlayers = isLatePhase
-    ? players.filter((player) => player.status === 'eliminated')
-    : [];
+    ? visiblePlayers.filter((player) => player.status === 'active' || player.status === 'winner')
+    : visiblePlayers;
 
   const phaseLabel =
     currentPhase === 5
@@ -571,12 +572,12 @@ export default function LeaderboardScreen({ players, currentPhase = 1 }: Leaderb
   const trimmed = query.trim().toLowerCase();
   const filtered = useMemo(() => {
     if (!trimmed) return [];
-    return players.filter(
+    return visiblePlayers.filter(
       (p) =>
         p.name.toLowerCase().includes(trimmed) ||
         p.team.toLowerCase().includes(trimmed),
     );
-  }, [players, trimmed]);
+  }, [visiblePlayers, trimmed]);
 
   return (
     <div className="flex flex-col p-2 sm:p-4 bg-[#0a0a0b] sm:h-full sm:overflow-hidden">
@@ -589,14 +590,9 @@ export default function LeaderboardScreen({ players, currentPhase = 1 }: Leaderb
         </div>
         <div className="flex items-center gap-2 sm:gap-4 text-[11px] sm:text-sm">
           {isLatePhase ? (
-            <span className="text-zinc-500 whitespace-nowrap">
-              {activePlayers.length} aktif
-              {eliminatedPlayers.length > 0 && (
-                <span className="text-rose-700 ml-2">{eliminatedPlayers.length} gugur</span>
-              )}
-            </span>
+            <span className="text-zinc-500 whitespace-nowrap">{activePlayers.length} aktif</span>
           ) : (
-            <span className="text-zinc-500 whitespace-nowrap">{players.length} Players</span>
+            <span className="text-zinc-500 whitespace-nowrap">{visiblePlayers.length} Players</span>
           )}
           <span className="flex items-center gap-1 whitespace-nowrap">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -679,7 +675,7 @@ export default function LeaderboardScreen({ players, currentPhase = 1 }: Leaderb
 
       {/* Normal layout (desktop always; mobile when no query) */}
       <div className={`${trimmed ? 'hidden sm:flex' : 'flex'} flex-1 flex-col min-h-0 overflow-hidden`}>
-        <CompactAllPlayersLayout players={isLatePhase ? [...activePlayers, ...eliminatedPlayers] : players} />
+        <CompactAllPlayersLayout players={isLatePhase ? activePlayers : visiblePlayers} />
       </div>
     </div>
   );
