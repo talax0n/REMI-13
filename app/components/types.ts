@@ -9,6 +9,7 @@ export interface Player {
   isDummy?: boolean;
   currentTable?: number;
   currentPhaseScore?: number;
+  finalWildcard?: boolean;
 }
 
 export interface Table {

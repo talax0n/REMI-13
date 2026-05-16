@@ -18,6 +18,7 @@ function convertToPlayers(
   currentPhase: number,
   semifinalPhase: number,
   prevRanks: Map<string, number>,
+  wildcardIds: Set<string>,
 ): Player[] {
   const sortedScores = [...scores].sort((a, b) => {
     const scoreA = getDisplayScore(a, currentPhase, semifinalPhase);
@@ -39,6 +40,7 @@ function convertToPlayers(
     status: p.status,
     currentTable: p.currentTable,
     currentPhaseScore: p.scores?.[currentPhase]?.points ?? 0,
+    finalWildcard: wildcardIds.has(p.id),
   }));
 }
 
@@ -49,6 +51,7 @@ export default function ScreenController() {
   const [tables, setTables] = useState<Table[]>([]);
   const [currentPhase, setCurrentPhase] = useState(1);
   const [semifinalPhase, setSemifinalPhase] = useState(5);
+  const [finalWildcardIds, setFinalWildcardIds] = useState<string[]>([]);
 
   // Fetch current tournament phase on mount, then poll every 5s
   useEffect(() => {
@@ -60,6 +63,7 @@ export default function ScreenController() {
         if (!cancelled && data.tournamentState?.phase) {
           setCurrentPhase(data.tournamentState.phase);
           setSemifinalPhase(data.tournamentState.semifinalPhase ?? 5);
+          setFinalWildcardIds(data.tournamentState.finalWildcardIds ?? []);
         }
       } catch {
         // ignore
@@ -113,12 +117,13 @@ export default function ScreenController() {
 
   const displayTables = tables;
   const prevRanksRef = useRef<Map<string, number>>(new Map());
+  const wildcardIdSet = useMemo(() => new Set(finalWildcardIds), [finalWildcardIds]);
   const players = useMemo(
     // Ref holds the prior poll's ranks so we can render previousRank diffs;
     // it is only updated from the effect below, not during render.
     // eslint-disable-next-line react-hooks/refs
-    () => convertToPlayers(playerScores, currentPhase, semifinalPhase, prevRanksRef.current),
-    [currentPhase, playerScores, semifinalPhase]
+    () => convertToPlayers(playerScores, currentPhase, semifinalPhase, prevRanksRef.current, wildcardIdSet),
+    [currentPhase, playerScores, semifinalPhase, wildcardIdSet]
   );
   useEffect(() => {
     const next = new Map<string, number>();

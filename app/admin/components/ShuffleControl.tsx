@@ -22,11 +22,9 @@ interface ShuffleControlProps {
   state: TournamentState;
   targetPhase: number;
   semifinalCutoff: 10 | 20;
-  finalCutoff: 5 | 10;
   scoredSeatedCount: number;
   totalSeatedCount: number;
   onSemifinalCutoffChange: (cutoff: 10 | 20) => void;
-  onFinalCutoffChange: (cutoff: 5 | 10) => void;
   onShuffle: (opts?: ShuffleOptions) => Promise<ShuffleResult>;
   onPhaseComplete: (targetPhase: number) => void;
 }
@@ -35,11 +33,9 @@ export default function ShuffleControl({
   state,
   targetPhase,
   semifinalCutoff,
-  finalCutoff,
   scoredSeatedCount,
   totalSeatedCount,
   onSemifinalCutoffChange,
-  onFinalCutoffChange,
   onShuffle,
   onPhaseComplete,
 }: ShuffleControlProps) {
@@ -49,6 +45,9 @@ export default function ShuffleControl({
   const [partialScoreAcknowledged, setPartialScoreAcknowledged] = useState(false);
   const [tiebreak, setTiebreak] = useState<ShuffleTiebreakInfo | null>(null);
   const [tiebreakSelected, setTiebreakSelected] = useState<Set<string>>(new Set());
+  // Final flow can surface multiple ties sequentially (one per semifinal table + wildcard slot).
+  // Accumulate picks across rounds so already-resolved ties are not re-prompted.
+  const [resolvedTiebreakers, setResolvedTiebreakers] = useState<Record<string, string[]>>({});
 
   const hasPartialScores =
     totalSeatedCount > 0
@@ -88,7 +87,7 @@ export default function ShuffleControl({
   const finishShuffle = (warnings: string[]) => {
     const label =
       targetPhase === state.semifinalPhase ? `Semifinal (Top ${semifinalCutoff})` :
-      targetPhase === state.finalPhase ? `Final (Top ${finalCutoff})` :
+      targetPhase === state.finalPhase ? 'Final (Top 10: 8 meja + 2 wildcard)' :
       `Babak ${targetPhase}`;
     toast.success('Meja berhasil dibuat', {
       id: 'shuffle',
@@ -100,17 +99,18 @@ export default function ShuffleControl({
     onPhaseComplete(targetPhase);
   };
 
-  const runShuffle = async (opts?: ShuffleOptions) => {
+  const runShuffle = async (resolved: Record<string, string[]>) => {
     toast.loading('Generating tables...', { id: 'shuffle' });
     setIsShuffling(true);
     try {
-      const result = await onShuffle(opts);
+      const result = await onShuffle({ resolvedTiebreakers: resolved });
       if (result.tiebreak) {
         toast.dismiss('shuffle');
         setTiebreakSelected(new Set());
         setTiebreak(result.tiebreak);
         return;
       }
+      setResolvedTiebreakers({});
       finishShuffle(result.warnings);
     } catch (error) {
       toast.error('Gagal membuat meja', {
@@ -124,15 +124,17 @@ export default function ShuffleControl({
 
   const handleConfirmShuffle = async () => {
     setIsDialogOpen(false);
-    await runShuffle();
+    setResolvedTiebreakers({});
+    await runShuffle({});
   };
 
   const handleConfirmTiebreak = async () => {
     if (!tiebreak) return;
     if (tiebreakSelected.size !== tiebreak.slotsRemaining) return;
-    const ids = Array.from(tiebreakSelected);
+    const merged = { ...resolvedTiebreakers, [tiebreak.phaseLabel]: Array.from(tiebreakSelected) };
+    setResolvedTiebreakers(merged);
     setTiebreak(null);
-    await runShuffle({ tiebreakerIds: ids });
+    await runShuffle(merged);
   };
 
   const toggleTiebreakPick = (id: string) => {
@@ -250,7 +252,7 @@ export default function ShuffleControl({
               {targetPhase === state.semifinalPhase
                 ? `Akan memilih ${semifinalCutoff} pemain teratas untuk Semifinal (Babak ${state.semifinalPhase}).`
                 : targetPhase === state.finalPhase
-                ? `Akan memilih ${finalCutoff} pemain teratas untuk Final (Babak ${state.finalPhase}).`
+                ? `Akan memilih 10 finalis untuk Final (Babak ${state.finalPhase}): Top 2 dari setiap meja semifinal (8) + 2 wildcard berdasarkan skor semifinal tertinggi dari sisa pemain.`
                 : `Akan men-shuffle meja untuk Babak ${targetPhase}.`}
             </DialogDescription>
           </DialogHeader>
@@ -274,32 +276,13 @@ export default function ShuffleControl({
             </div>
           )}
 
-          {targetPhase === state.finalPhase && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-zinc-300">Final cutoff</p>
-              <div className="grid grid-cols-2 gap-2">
-                {[5, 10].map((cutoff) => (
-                  <Button
-                    key={cutoff}
-                    type="button"
-                    variant={finalCutoff === cutoff ? 'default' : 'outline'}
-                    onClick={() => onFinalCutoffChange(cutoff as 5 | 10)}
-                    className={finalCutoff === cutoff ? 'bg-blue-600 hover:bg-blue-500' : 'border-white/20 text-white hover:bg-white/10'}
-                  >
-                    Top {cutoff}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 my-4">
             <p className="text-sm text-yellow-400">
               <strong>Peringatan:</strong>{' '}
               {targetPhase === state.semifinalPhase
                 ? `Pemain di luar Top ${semifinalCutoff} akan dieliminasi.`
                 : targetPhase === state.finalPhase
-                ? `Pemain di luar Top ${finalCutoff} akan dieliminasi.`
+                ? 'Pemain di luar 10 finalis akan dieliminasi.'
                 : 'Semua penugasan meja saat ini akan diganti.'}
             </p>
           </div>
@@ -401,6 +384,7 @@ export default function ShuffleControl({
           if (!open) {
             setTiebreak(null);
             setTiebreakSelected(new Set());
+            setResolvedTiebreakers({});
             toast.dismiss('shuffle');
           }
         }}
@@ -475,6 +459,7 @@ export default function ShuffleControl({
               onClick={() => {
                 setTiebreak(null);
                 setTiebreakSelected(new Set());
+                setResolvedTiebreakers({});
                 toast.dismiss('shuffle');
               }}
               className="border-white/20 text-white hover:bg-white/10"

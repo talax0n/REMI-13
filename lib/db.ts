@@ -108,6 +108,13 @@ async function runMigration(): Promise<void> {
           ALTER TABLE tournament_state ADD COLUMN final_phase INTEGER NOT NULL DEFAULT 6;
         END IF;
 
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'tournament_state' AND column_name = 'final_wildcard_ids'
+        ) THEN
+          ALTER TABLE tournament_state ADD COLUMN final_wildcard_ids JSONB NOT NULL DEFAULT '[]'::jsonb;
+        END IF;
+
         IF EXISTS (
           SELECT 1 FROM information_schema.columns
           WHERE table_name = 'players' AND column_name = 'church'

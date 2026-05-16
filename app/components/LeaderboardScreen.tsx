@@ -99,6 +99,11 @@ function TopTenPlayer({ player, index }: { player: Player; index: number }) {
         <div className="flex items-center gap-2">
           <h3 className="font-bold text-white text-sm sm:text-base truncate">{player.name}</h3>
           <RankChange current={player.rank} previous={player.previousRank} />
+          {player.finalWildcard && (
+            <span className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 border border-purple-400/40 text-purple-200">
+              Wildcard
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className={`text-xs sm:text-sm ${teamStyle.text}`}>{player.team}</span>
@@ -260,6 +265,11 @@ function CompactLeaderboardRow({ player, index }: { player: Player; index: numbe
       >
         {player.name}
       </span>
+      {player.finalWildcard && !isEliminated && (
+        <span className="shrink-0 text-[9px] 2xl:text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 border border-purple-400/40 text-purple-200">
+          WC
+        </span>
+      )}
       <span className={`truncate text-[10px] 2xl:text-xs ${teamStyle.text}`}>{player.team}</span>
       <RankChange current={player.rank} previous={player.previousRank} />
       <span className="ml-auto shrink-0 text-[11px] 2xl:text-sm tabular-nums text-zinc-500">
@@ -425,7 +435,12 @@ function Phase6Layout({ active, eliminated }: { active: Player[]; eliminated: Pl
       {/* Finalists */}
       <div className="w-full sm:w-96 mx-auto flex flex-col gap-2 shrink-0">
         <h2 className="text-xs font-medium text-yellow-500 uppercase tracking-wider mb-1">
-          Final — Top {active.length}
+          Final — {active.length} Finalis
+          {active.some((p) => p.finalWildcard) && (
+            <span className="ml-2 text-purple-300 normal-case tracking-normal">
+              ({active.filter((p) => p.finalWildcard).length} wildcard)
+            </span>
+          )}
         </h2>
         <div className="space-y-1">
           {active.map((player, index) => (

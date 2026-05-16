@@ -24,6 +24,12 @@ interface TournamentStateRow {
   final_cutoff: number;
   semifinal_phase: number;
   final_phase: number;
+  final_wildcard_ids: string[];
+}
+
+function normalizeWildcardIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === 'string');
 }
 
 function normalizeSemifinalCutoff(value: unknown): 10 | 20 {
@@ -63,7 +69,7 @@ export async function GET() {
   const [playerRows, stateRows] = await Promise.all([
     query<PlayerRow>('SELECT * FROM players ORDER BY total_score DESC'),
     query<TournamentStateRow>(
-      'SELECT phase, status, max_phases, semifinal_cutoff, final_cutoff, semifinal_phase, final_phase FROM tournament_state WHERE id = 1'
+      'SELECT phase, status, max_phases, semifinal_cutoff, final_cutoff, semifinal_phase, final_phase, final_wildcard_ids FROM tournament_state WHERE id = 1'
     ),
   ]);
 
@@ -75,6 +81,7 @@ export async function GET() {
     final_cutoff: 10,
     semifinal_phase: 5,
     final_phase: 6,
+    final_wildcard_ids: [],
   };
 
   const participants: AdminParticipant[] = playerRows.map((row) => ({
@@ -119,6 +126,7 @@ export async function GET() {
       isFinalPhase: tournamentState.phase >= phaseConfig.finalPhase,
       semifinalCutoff: normalizeSemifinalCutoff(tournamentState.semifinal_cutoff),
       finalCutoff: normalizeFinalCutoff(tournamentState.final_cutoff),
+      finalWildcardIds: normalizeWildcardIds(tournamentState.final_wildcard_ids),
     },
   });
 }
@@ -137,6 +145,7 @@ export async function POST(request: Request) {
              max_phases = 6,
              semifinal_phase = 5,
              final_phase = 6,
+             final_wildcard_ids = '[]'::jsonb,
              updated_at = NOW()
          WHERE id = 1`
       ),
@@ -156,12 +165,14 @@ export async function POST(request: Request) {
         isFinalPhase: false,
         semifinalCutoff: 20,
         finalCutoff: 10,
+        finalWildcardIds: [],
       },
     });
   }
 
-  const { phase, status, maxPhases, semifinalCutoff, finalCutoff, semifinalPhase, finalPhase } = body;
+  const { phase, status, maxPhases, semifinalCutoff, finalCutoff, semifinalPhase, finalPhase, finalWildcardIds } = body;
   const phaseConfig = normalizePhaseConfig({ maxPhases, semifinalPhase, finalPhase });
+  const wildcardIds = normalizeWildcardIds(finalWildcardIds);
 
   await query(
     `UPDATE tournament_state
@@ -172,6 +183,7 @@ export async function POST(request: Request) {
          final_cutoff = $5,
          semifinal_phase = $6,
          final_phase = $7,
+         final_wildcard_ids = $8::jsonb,
          updated_at = NOW()
      WHERE id = 1`,
     [
@@ -182,6 +194,7 @@ export async function POST(request: Request) {
       normalizeFinalCutoff(finalCutoff),
       phaseConfig.semifinalPhase,
       phaseConfig.finalPhase,
+      JSON.stringify(wildcardIds),
     ]
   );
 

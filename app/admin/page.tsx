@@ -51,7 +51,10 @@ export type ShuffleResult = {
 };
 
 export type ShuffleOptions = {
-  tiebreakerIds?: string[];
+  // Map of phaseLabel -> selected tied-player IDs. Final flow can have multiple
+  // simultaneous ties (per-table + wildcard), so caller accumulates picks across
+  // rounds and re-invokes shuffle with the merged map.
+  resolvedTiebreakers?: Record<string, string[]>;
 };
 
 function resolveCutoffSelection<T extends { id: string; name: string; team: string; matchesPlayed: number }>(
@@ -209,6 +212,7 @@ export default function AdminPage() {
     isFinalPhase: false,
     semifinalCutoff: 20,
     finalCutoff: 10,
+    finalWildcardIds: [],
   });
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     if (typeof window === 'undefined') return 'participants';
@@ -273,6 +277,7 @@ export default function AdminPage() {
         finalPhase: next.finalPhase,
         semifinalCutoff: nextSemifinalCutoff,
         finalCutoff: nextFinalCutoff,
+        finalWildcardIds: next.finalWildcardIds ?? [],
       }),
     }).catch(console.error);
   }, [finalCutoff, semifinalCutoff]);
@@ -286,7 +291,10 @@ export default function AdminPage() {
     const wasEnabled = syncEnabled.current;
     syncEnabled.current = false;
     setParticipants(data.participants);
-    setTournamentState(data.tournamentState);
+    setTournamentState({
+      ...data.tournamentState,
+      finalWildcardIds: data.tournamentState.finalWildcardIds ?? [],
+    });
     setPhaseScores(data.phaseScores ?? {});
     setSemifinalCutoff(data.tournamentState.semifinalCutoff ?? 20);
     setFinalCutoff(data.tournamentState.finalCutoff ?? 10);
@@ -421,35 +429,68 @@ export default function AdminPage() {
     lastLocalMutationAt.current = Date.now();
     const participantsWithCurrentHistory = recordTableOpponentHistory(participants);
 
-    // Final phase → top N (cutoff-defined finalists)
+    // Final phase → 4 semifinal tables × top 2 by semifinal phase score + 2 wildcards
+    // (highest semifinal phase score among players not selected as table-top-2).
     if (shuffleTargetPhase === tournamentState.finalPhase) {
       const finalScoreOf = (p: AdminParticipant) =>
         getPhaseAwareScore(p, phaseScores, tournamentState.semifinalPhase, tournamentState.semifinalPhase);
-      const sorted = [...participantsWithCurrentHistory]
-        .filter((p) => p.status === 'active')
-        .sort((a, b) => finalScoreOf(b) - finalScoreOf(a));
 
-      if (sorted.length < finalCutoff) {
-        throw new Error(`Butuh minimal ${finalCutoff} pemain aktif untuk babak final`);
+      const semifinalists = participantsWithCurrentHistory.filter((p) => p.status === 'active');
+      if (semifinalists.length < 10) {
+        throw new Error('Butuh minimal 10 pemain aktif untuk babak final');
       }
 
-      const resolution = resolveCutoffSelection(
-        sorted,
+      const byTable = new Map<number, AdminParticipant[]>();
+      for (const p of semifinalists) {
+        if (p.tableNumber === undefined) continue;
+        const list = byTable.get(p.tableNumber) ?? [];
+        list.push(p);
+        byTable.set(p.tableNumber, list);
+      }
+      const tableNumbers = Array.from(byTable.keys()).sort((a, b) => a - b);
+      for (const tn of tableNumbers) {
+        byTable.get(tn)!.sort((a, b) => finalScoreOf(b) - finalScoreOf(a));
+      }
+
+      const resolved = opts?.resolvedTiebreakers ?? {};
+      const tableQualifiers: AdminParticipant[] = [];
+      const remaining: AdminParticipant[] = [];
+
+      for (const tn of tableNumbers) {
+        const arr = byTable.get(tn)!;
+        const label = `Final · Meja ${tn} (Top 2)`;
+        const cut = Math.min(2, arr.length);
+        const res = resolveCutoffSelection(arr, finalScoreOf, cut, label, resolved[label]);
+        if (res.tiebreak) {
+          return { warnings: [], tiebreak: res.tiebreak };
+        }
+        tableQualifiers.push(...res.selected);
+        const picked = new Set(res.selected.map((p) => p.id));
+        for (const p of arr) if (!picked.has(p.id)) remaining.push(p);
+      }
+
+      remaining.sort((a, b) => finalScoreOf(b) - finalScoreOf(a));
+      const wildcardLabel = 'Final · Wildcard (Top 2)';
+      const wildcardCut = Math.min(2, remaining.length, 10 - tableQualifiers.length);
+      const wildcardRes = resolveCutoffSelection(
+        remaining,
         finalScoreOf,
-        finalCutoff,
-        `Final (Top ${finalCutoff})`,
-        opts?.tiebreakerIds,
+        wildcardCut,
+        wildcardLabel,
+        resolved[wildcardLabel],
       );
-      if (resolution.tiebreak) {
-        return { warnings: [], tiebreak: resolution.tiebreak };
+      if (wildcardRes.tiebreak) {
+        return { warnings: [], tiebreak: wildcardRes.tiebreak };
       }
-      const finalists = resolution.selected;
+      const wildcards = wildcardRes.selected;
+      const finalists = [...tableQualifiers, ...wildcards];
+      const wildcardIdSet = new Set(wildcards.map((p) => p.id));
 
       const engineParticipants: EngineParticipant[] = finalists.map((p) => ({
         id: p.id,
         name: p.name,
         team: p.team,
-        score: getPhaseAwareScore(p, phaseScores, tournamentState.semifinalPhase, tournamentState.semifinalPhase),
+        score: finalScoreOf(p),
         opponents: new Set(p.opponents ?? []),
       }));
 
@@ -484,9 +525,10 @@ export default function AdminPage() {
       setTournamentState((prev) => ({
         ...prev,
         isFinalPhase: true,
-        totalTables: Math.ceil(finalCutoff / 5),
+        totalTables: Math.ceil(finalists.length / 5),
         finalTableA: undefined,
         finalTableB: undefined,
+        finalWildcardIds: Array.from(wildcardIdSet),
       }));
       return { warnings: shuffleResult.warnings };
     }
@@ -502,12 +544,13 @@ export default function AdminPage() {
         throw new Error(`Butuh minimal ${semifinalCutoff} pemain aktif untuk babak semifinal`);
       }
 
+      const semifinalLabel = `Semifinal (Top ${semifinalCutoff})`;
       const resolution = resolveCutoffSelection(
         sorted,
         semifinalScoreOf,
         semifinalCutoff,
-        `Semifinal (Top ${semifinalCutoff})`,
-        opts?.tiebreakerIds,
+        semifinalLabel,
+        opts?.resolvedTiebreakers?.[semifinalLabel],
       );
       if (resolution.tiebreak) {
         return { warnings: [], tiebreak: resolution.tiebreak };
@@ -602,7 +645,7 @@ export default function AdminPage() {
 
     setParticipants(updated);
     return { warnings };
-  }, [finalCutoff, participants, phaseScores, semifinalCutoff, shuffleTargetPhase, tournamentState.finalPhase, tournamentState.semifinalPhase]);
+  }, [participants, phaseScores, semifinalCutoff, shuffleTargetPhase, tournamentState.finalPhase, tournamentState.semifinalPhase]);
 
   // Mark generated phase as active.
   const handlePhaseComplete = useCallback((targetPhase: number) => {
@@ -649,11 +692,13 @@ export default function AdminPage() {
     }
 
     setTournamentState((prev) => {
+      const clearWildcards = wipedPhase >= prev.finalPhase;
       const next = {
         ...prev,
         phase: newPhase,
         status: 'waiting' as TournamentState['status'],
         isFinalPhase: newPhase >= prev.finalPhase,
+        finalWildcardIds: clearWildcards ? [] : prev.finalWildcardIds,
       };
       persistTournamentState(next);
       return next;
@@ -727,15 +772,6 @@ export default function AdminPage() {
       return next;
     });
   }, [finalCutoff, persistTournamentState]);
-
-  const handleFinalCutoffChange = useCallback((cutoff: 5 | 10) => {
-    setFinalCutoff(cutoff);
-    setTournamentState((prev) => {
-      const next = { ...prev, finalCutoff: cutoff };
-      persistTournamentState(next, semifinalCutoff, cutoff);
-      return next;
-    });
-  }, [persistTournamentState, semifinalCutoff]);
 
   const handlePhaseConfigChange = useCallback((
     maxPhases: number,
@@ -1186,11 +1222,9 @@ export default function AdminPage() {
                   state={tournamentState}
                   targetPhase={shuffleTargetPhase}
                   semifinalCutoff={semifinalCutoff}
-                  finalCutoff={finalCutoff}
                   scoredSeatedCount={seatedActiveScoredCount}
                   totalSeatedCount={seatedActiveParticipants.length}
                   onSemifinalCutoffChange={handleSemifinalCutoffChange}
-                  onFinalCutoffChange={handleFinalCutoffChange}
                   onShuffle={handleShuffle}
                   onPhaseComplete={handlePhaseComplete}
                 />
