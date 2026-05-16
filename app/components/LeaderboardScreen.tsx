@@ -241,7 +241,15 @@ function CompactLeaderboardRow({ player, index }: { player: Player; index: numbe
       }`}
     >
       <span className={`w-8 2xl:w-12 shrink-0 text-sm 2xl:text-lg font-bold tabular-nums ${
-        isEliminated ? 'text-zinc-500' : 'text-zinc-100'
+        isEliminated
+          ? 'text-zinc-500'
+          : player.rank <= 3
+            ? 'text-yellow-300'
+            : player.rank <= 10
+              ? 'text-amber-400'
+              : player.rank <= 20
+                ? 'text-yellow-500/80'
+                : 'text-zinc-400'
       }`}>
         #{player.rank}
       </span>
