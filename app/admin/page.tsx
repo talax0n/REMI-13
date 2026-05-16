@@ -30,6 +30,82 @@ import {
 } from '@/lib/shuffle-engine';
 import { recordTableOpponentHistory } from '@/lib/opponent-history';
 
+export type ShuffleTiebreakInfo = {
+  phaseLabel: string;
+  cutoff: number;
+  tiedScore: number;
+  guaranteedCount: number;
+  slotsRemaining: number;
+  candidates: Array<{
+    id: string;
+    name: string;
+    team: string;
+    score: number;
+    matchesPlayed: number;
+  }>;
+};
+
+export type ShuffleResult = {
+  warnings: string[];
+  tiebreak?: ShuffleTiebreakInfo;
+};
+
+export type ShuffleOptions = {
+  tiebreakerIds?: string[];
+};
+
+function resolveCutoffSelection<T extends { id: string; name: string; team: string; matchesPlayed: number }>(
+  sorted: T[],
+  scoreOf: (p: T) => number,
+  cutoff: number,
+  phaseLabel: string,
+  tiebreakerIds: string[] | undefined,
+): { selected: T[]; tiebreak?: ShuffleTiebreakInfo } {
+  if (sorted.length <= cutoff) {
+    return { selected: sorted.slice(0, cutoff) };
+  }
+
+  const boundaryScore = scoreOf(sorted[cutoff - 1]);
+  const guaranteed = sorted.filter((p) => scoreOf(p) > boundaryScore);
+  const tied = sorted.filter((p) => scoreOf(p) === boundaryScore);
+  const slotsRemaining = cutoff - guaranteed.length;
+
+  if (tied.length <= slotsRemaining) {
+    return { selected: sorted.slice(0, cutoff) };
+  }
+
+  if (!tiebreakerIds || tiebreakerIds.length !== slotsRemaining) {
+    return {
+      selected: [],
+      tiebreak: {
+        phaseLabel,
+        cutoff,
+        tiedScore: boundaryScore,
+        guaranteedCount: guaranteed.length,
+        slotsRemaining,
+        candidates: tied.map((p) => ({
+          id: p.id,
+          name: p.name,
+          team: p.team,
+          score: scoreOf(p),
+          matchesPlayed: p.matchesPlayed,
+        })),
+      },
+    };
+  }
+
+  const tiedIds = new Set(tied.map((p) => p.id));
+  const validSelected = tiebreakerIds.filter((id) => tiedIds.has(id));
+  if (validSelected.length !== slotsRemaining) {
+    throw new Error(
+      `Pilih tepat ${slotsRemaining} pemain dari ${tied.length} pemain dengan skor ${boundaryScore}.`
+    );
+  }
+  const selectedSet = new Set(validSelected);
+  const selectedTied = tied.filter((p) => selectedSet.has(p.id));
+  return { selected: [...guaranteed, ...selectedTied] };
+}
+
 function getPhaseAwareScore(
   participant: AdminParticipant,
   phaseScores: Record<string, Record<number, number>>,
@@ -157,6 +233,7 @@ export default function AdminPage() {
   const syncEnabled = useRef(false);
   const lastLocalMutationAt = useRef(0);
   const isPollingRef = useRef(false);
+  const isSyncingRef = useRef(false);
 
   const teams = useMemo(() => extractTeams(participants), [participants]);
   const seatedActiveParticipants = useMemo(
@@ -238,10 +315,11 @@ export default function AdminPage() {
   // would race against it).
   useEffect(() => {
     const POLL_MS = 5000;
-    const MUTATION_COOLDOWN_MS = 2500;
+    const MUTATION_COOLDOWN_MS = 6000;
 
     const refresh = async () => {
       if (isPollingRef.current) return;
+      if (isSyncingRef.current) return;
       if (typeof document !== 'undefined' && document.hidden) return;
       if (Date.now() - lastLocalMutationAt.current < MUTATION_COOLDOWN_MS) return;
       isPollingRef.current = true;
@@ -249,6 +327,7 @@ export default function AdminPage() {
         const res = await fetch('/api/admin', { cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json();
+        if (isSyncingRef.current) return;
         if (Date.now() - lastLocalMutationAt.current < MUTATION_COOLDOWN_MS) return;
         applyServerState(data);
       } catch {
@@ -334,25 +413,37 @@ export default function AdminPage() {
   );
 
   // Shuffle tables
-  const handleShuffle = useCallback(async () => {
+  const handleShuffle = useCallback(async (opts?: ShuffleOptions): Promise<ShuffleResult> => {
+    // Stamp early so polling cooldown covers the 1.5s UI delay + state update + sync POSTs.
+    // Without this, a poll firing mid-shuffle can overwrite the new layout with stale DB rows.
+    lastLocalMutationAt.current = Date.now();
     await new Promise((resolve) => setTimeout(resolve, 1500));
+    lastLocalMutationAt.current = Date.now();
     const participantsWithCurrentHistory = recordTableOpponentHistory(participants);
 
     // Final phase → top N (cutoff-defined finalists)
     if (shuffleTargetPhase === tournamentState.finalPhase) {
+      const finalScoreOf = (p: AdminParticipant) =>
+        getPhaseAwareScore(p, phaseScores, tournamentState.semifinalPhase, tournamentState.semifinalPhase);
       const sorted = [...participantsWithCurrentHistory]
         .filter((p) => p.status === 'active')
-        .sort(
-          (a, b) =>
-            getPhaseAwareScore(b, phaseScores, tournamentState.semifinalPhase, tournamentState.semifinalPhase)
-            - getPhaseAwareScore(a, phaseScores, tournamentState.semifinalPhase, tournamentState.semifinalPhase)
-        );
+        .sort((a, b) => finalScoreOf(b) - finalScoreOf(a));
 
-      const finalists = sorted.slice(0, finalCutoff);
-
-      if (finalists.length < finalCutoff) {
+      if (sorted.length < finalCutoff) {
         throw new Error(`Butuh minimal ${finalCutoff} pemain aktif untuk babak final`);
       }
+
+      const resolution = resolveCutoffSelection(
+        sorted,
+        finalScoreOf,
+        finalCutoff,
+        `Final (Top ${finalCutoff})`,
+        opts?.tiebreakerIds,
+      );
+      if (resolution.tiebreak) {
+        return { warnings: [], tiebreak: resolution.tiebreak };
+      }
+      const finalists = resolution.selected;
 
       const engineParticipants: EngineParticipant[] = finalists.map((p) => ({
         id: p.id,
@@ -402,15 +493,26 @@ export default function AdminPage() {
 
     // Semifinal phase → top N (cutoff-defined semifinalists)
     if (shuffleTargetPhase === tournamentState.semifinalPhase) {
+      const semifinalScoreOf = (p: AdminParticipant) => p.score;
       const sorted = [...participantsWithCurrentHistory]
         .filter((p) => p.status === 'active')
-        .sort((a, b) => b.score - a.score);
+        .sort((a, b) => semifinalScoreOf(b) - semifinalScoreOf(a));
 
-      const semifinalists = sorted.slice(0, semifinalCutoff);
-
-      if (semifinalists.length < semifinalCutoff) {
+      if (sorted.length < semifinalCutoff) {
         throw new Error(`Butuh minimal ${semifinalCutoff} pemain aktif untuk babak semifinal`);
       }
+
+      const resolution = resolveCutoffSelection(
+        sorted,
+        semifinalScoreOf,
+        semifinalCutoff,
+        `Semifinal (Top ${semifinalCutoff})`,
+        opts?.tiebreakerIds,
+      );
+      if (resolution.tiebreak) {
+        return { warnings: [], tiebreak: resolution.tiebreak };
+      }
+      const semifinalists = resolution.selected;
 
       const engineParticipants: EngineParticipant[] = semifinalists.map((p) => ({
         id: p.id,
@@ -781,6 +883,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!syncEnabled.current) return;
     lastLocalMutationAt.current = Date.now();
+    isSyncingRef.current = true;
     const sync = async () => {
       const tables = buildTablesFromParticipants(
         participants,
@@ -802,7 +905,14 @@ export default function AdminPage() {
           body: JSON.stringify(tables),
         }).catch(console.error)
       );
-      await Promise.all(fetches);
+      try {
+        await Promise.all(fetches);
+      } finally {
+        // Re-stamp after writes settle so polling cooldown is measured from
+        // commit time, not effect-fire time. Guards against slow serverless writes.
+        lastLocalMutationAt.current = Date.now();
+        isSyncingRef.current = false;
+      }
     };
     sync();
   }, [participants, phaseScores, tournamentState.phase, tournamentState.semifinalPhase]);

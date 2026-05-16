@@ -189,7 +189,7 @@ function addTableScoreSheet(
 
   worksheet.mergeCells('A1:G1');
   worksheet.mergeCells('A2:G2');
-  worksheet.getCell('A1').value = 'Remi 13 - Table Pairings';
+  worksheet.getCell('A1').value = 'Remi 13 - DS Cileungsi - Table Pairings';
   worksheet.getCell('A2').value = `Phase ${phase} • Generated ${generatedAt}`;
 
   worksheet.getRow(1).height = 28;
@@ -253,13 +253,13 @@ export async function GET() {
   const phase = stateRows[0]?.phase ?? 1;
   const generatedAt = formatGeneratedAt(new Date());
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Remi 13 Admin';
+  workbook.creator = 'Remi 13 - DS Cileungsi Admin';
   workbook.created = new Date();
 
   addPairingSheet(
     workbook,
     'All Tables',
-    'Remi 13 - Table Pairings',
+    'Remi 13 - DS Cileungsi - Table Pairings',
     phase,
     generatedAt,
     tables

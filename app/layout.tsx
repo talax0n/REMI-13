@@ -15,7 +15,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Remi 13 Tournament",
+  title: "Remi 13 - DS Cileungsi Tournament",
   description: "Competition Display System",
 };
 

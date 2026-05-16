@@ -123,7 +123,7 @@ function LoginForm({
           >
             <img src="/LOGO.png" alt="Remi 13 Logo" className="w-20 h-20 rounded-2xl object-contain" />
           </motion.div>
-          <h1 className="text-3xl font-bold text-white mb-2">Remi 13</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">Remi 13 - DS Cileungsi</h1>
           <p className="text-zinc-400">Check your tournament scores</p>
         </div>
 

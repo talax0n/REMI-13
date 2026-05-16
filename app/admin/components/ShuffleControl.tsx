@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { TournamentState } from '../types';
+import type { ShuffleOptions, ShuffleResult, ShuffleTiebreakInfo } from '../page';
 import { toast } from 'sonner';
 
 interface ShuffleControlProps {
@@ -26,7 +27,7 @@ interface ShuffleControlProps {
   totalSeatedCount: number;
   onSemifinalCutoffChange: (cutoff: 10 | 20) => void;
   onFinalCutoffChange: (cutoff: 5 | 10) => void;
-  onShuffle: () => Promise<{ warnings: string[] }>;
+  onShuffle: (opts?: ShuffleOptions) => Promise<ShuffleResult>;
   onPhaseComplete: (targetPhase: number) => void;
 }
 
@@ -46,6 +47,8 @@ export default function ShuffleControl({
   const [isShuffling, setIsShuffling] = useState(false);
   const [isPartialScoreAlertOpen, setIsPartialScoreAlertOpen] = useState(false);
   const [partialScoreAcknowledged, setPartialScoreAcknowledged] = useState(false);
+  const [tiebreak, setTiebreak] = useState<ShuffleTiebreakInfo | null>(null);
+  const [tiebreakSelected, setTiebreakSelected] = useState<Set<string>>(new Set());
 
   const hasPartialScores =
     totalSeatedCount > 0
@@ -82,26 +85,33 @@ export default function ShuffleControl({
     setIsDialogOpen(true);
   };
 
-  const handleConfirmShuffle = async () => {
-    setIsDialogOpen(false);
-    setIsShuffling(true);
-    
+  const finishShuffle = (warnings: string[]) => {
+    const label =
+      targetPhase === state.semifinalPhase ? `Semifinal (Top ${semifinalCutoff})` :
+      targetPhase === state.finalPhase ? `Final (Top ${finalCutoff})` :
+      `Babak ${targetPhase}`;
+    toast.success('Meja berhasil dibuat', {
+      id: 'shuffle',
+      description: `Meja untuk ${label} sudah siap.`,
+    });
+    warnings.forEach((warning) => {
+      toast.warning('Catatan pairing', { description: warning });
+    });
+    onPhaseComplete(targetPhase);
+  };
+
+  const runShuffle = async (opts?: ShuffleOptions) => {
     toast.loading('Generating tables...', { id: 'shuffle' });
-    
+    setIsShuffling(true);
     try {
-      const result = await onShuffle();
-      const label =
-        targetPhase === state.semifinalPhase ? `Semifinal (Top ${semifinalCutoff})` :
-        targetPhase === state.finalPhase ? `Final (Top ${finalCutoff})` :
-        `Babak ${targetPhase}`;
-      toast.success('Meja berhasil dibuat', {
-        id: 'shuffle',
-        description: `Meja untuk ${label} sudah siap.`,
-      });
-      result.warnings.forEach((warning) => {
-        toast.warning('Catatan pairing', { description: warning });
-      });
-      onPhaseComplete(targetPhase);
+      const result = await onShuffle(opts);
+      if (result.tiebreak) {
+        toast.dismiss('shuffle');
+        setTiebreakSelected(new Set());
+        setTiebreak(result.tiebreak);
+        return;
+      }
+      finishShuffle(result.warnings);
     } catch (error) {
       toast.error('Gagal membuat meja', {
         id: 'shuffle',
@@ -110,6 +120,33 @@ export default function ShuffleControl({
     } finally {
       setIsShuffling(false);
     }
+  };
+
+  const handleConfirmShuffle = async () => {
+    setIsDialogOpen(false);
+    await runShuffle();
+  };
+
+  const handleConfirmTiebreak = async () => {
+    if (!tiebreak) return;
+    if (tiebreakSelected.size !== tiebreak.slotsRemaining) return;
+    const ids = Array.from(tiebreakSelected);
+    setTiebreak(null);
+    await runShuffle({ tiebreakerIds: ids });
+  };
+
+  const toggleTiebreakPick = (id: string) => {
+    if (!tiebreak) return;
+    setTiebreakSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+        return next;
+      }
+      if (next.size >= tiebreak.slotsRemaining) return prev;
+      next.add(id);
+      return next;
+    });
   };
 
   return (
@@ -353,6 +390,103 @@ export default function ShuffleControl({
               className="bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Lanjut Shuffle
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={tiebreak !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTiebreak(null);
+            setTiebreakSelected(new Set());
+            toast.dismiss('shuffle');
+          }
+        }}
+      >
+        <DialogContent className="bg-zinc-900 border-yellow-500/40 text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-yellow-400" />
+              Pilih pemain untuk {tiebreak?.phaseLabel}
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              {tiebreak ? (
+                <>
+                  {tiebreak.guaranteedCount} pemain otomatis lolos. Tersisa{' '}
+                  <span className="font-semibold text-yellow-300">{tiebreak.slotsRemaining} slot</span>{' '}
+                  untuk {tiebreak.candidates.length} pemain dengan skor sama
+                  (<span className="font-semibold">{tiebreak.tiedScore}</span>). Pilih yang lolos.
+                </>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+
+          {tiebreak && (
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+              {tiebreak.candidates.map((c) => {
+                const checked = tiebreakSelected.has(c.id);
+                const disabled = !checked && tiebreakSelected.size >= tiebreak.slotsRemaining;
+                return (
+                  <label
+                    key={c.id}
+                    className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                      checked
+                        ? 'border-yellow-500/60 bg-yellow-500/10'
+                        : disabled
+                          ? 'border-white/5 bg-zinc-800/30 opacity-50 cursor-not-allowed'
+                          : 'border-white/10 bg-zinc-800/40 hover:bg-zinc-800/70'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={disabled}
+                      onChange={() => toggleTiebreakPick(c.id)}
+                      className="h-4 w-4 rounded border-white/20 bg-zinc-900 accent-yellow-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{c.name}</p>
+                      <p className="text-xs text-zinc-400 truncate">{c.team}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-yellow-300 tabular-nums">{c.score}</p>
+                      <p className="text-[10px] uppercase tracking-wider text-zinc-500">
+                        {c.matchesPlayed} match
+                      </p>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between rounded-lg border border-white/10 bg-zinc-800/40 px-3 py-2">
+            <span className="text-xs uppercase tracking-wider text-zinc-500">Terpilih</span>
+            <span className="text-sm font-semibold tabular-nums">
+              {tiebreakSelected.size} / {tiebreak?.slotsRemaining ?? 0}
+            </span>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setTiebreak(null);
+                setTiebreakSelected(new Set());
+                toast.dismiss('shuffle');
+              }}
+              className="border-white/20 text-white hover:bg-white/10"
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={handleConfirmTiebreak}
+              disabled={!tiebreak || tiebreakSelected.size !== tiebreak.slotsRemaining}
+              className="bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-950"
+            >
+              Lanjut Generate
             </Button>
           </DialogFooter>
         </DialogContent>

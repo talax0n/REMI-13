@@ -150,7 +150,7 @@ export default function ScreenController() {
           className="text-base font-bold text-white"
           style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
         >
-          Remi 13
+          Remi 13 - DS Cileungsi
         </span>
       </header>
 
@@ -163,7 +163,7 @@ export default function ScreenController() {
             className="text-lg font-bold text-white truncate"
             style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
           >
-            Remi 13
+            Remi 13 - DS Cileungsi
           </span>
         </div>
 
