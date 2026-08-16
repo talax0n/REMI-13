@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { query, ensureMigrated } from '@/lib/db';
 import { AdminParticipant } from '@/app/admin/types';
+import { LEGACY_SEMIFINAL_PHASE, REMI13_RULES } from '@/lib/tournament-config';
 
 interface PlayerRow {
   id: string;
@@ -27,40 +28,10 @@ interface TournamentStateRow {
   final_wildcard_ids: string[];
 }
 
-function normalizeWildcardIds(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((v): v is string => typeof v === 'string');
-}
-
-function normalizeSemifinalCutoff(value: unknown): 10 | 20 {
-  return value === 10 ? 10 : 20;
-}
-
-function normalizeFinalCutoff(value: unknown): 5 | 10 {
-  return value === 5 ? 5 : 10;
-}
-
-function normalizePositiveInt(value: unknown, fallback: number): number {
-  const n = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(n) || n < 1) return fallback;
-  return Math.floor(n);
-}
-
-function normalizePhaseConfig(input: {
-  maxPhases: unknown;
-  semifinalPhase: unknown;
-  finalPhase: unknown;
-}): { maxPhases: number; semifinalPhase: number; finalPhase: number } {
-  const maxPhases = Math.max(2, normalizePositiveInt(input.maxPhases, 6));
-  const finalPhase = Math.min(
-    maxPhases,
-    Math.max(2, normalizePositiveInt(input.finalPhase, maxPhases))
-  );
-  const semifinalPhase = Math.min(
-    finalPhase - 1,
-    Math.max(1, normalizePositiveInt(input.semifinalPhase, finalPhase - 1))
-  );
-  return { maxPhases, semifinalPhase, finalPhase };
+function normalizePhase(value: unknown): number {
+  const phase = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(phase)) return 1;
+  return Math.min(REMI13_RULES.totalPhases, Math.max(1, Math.floor(phase)));
 }
 
 export async function GET() {
@@ -76,11 +47,11 @@ export async function GET() {
   const tournamentState = stateRows[0] ?? {
     phase: 1,
     status: 'in_progress',
-    max_phases: 6,
+    max_phases: REMI13_RULES.totalPhases,
     semifinal_cutoff: 20,
     final_cutoff: 10,
-    semifinal_phase: 5,
-    final_phase: 6,
+    semifinal_phase: LEGACY_SEMIFINAL_PHASE,
+    final_phase: REMI13_RULES.totalPhases,
     final_wildcard_ids: [],
   };
 
@@ -107,26 +78,25 @@ export async function GET() {
   );
 
   const activeCount = participants.filter((p) => p.status === 'active').length;
-  const phaseConfig = normalizePhaseConfig({
-    maxPhases: tournamentState.max_phases,
-    semifinalPhase: tournamentState.semifinal_phase,
-    finalPhase: tournamentState.final_phase,
-  });
+  const currentPhase = normalizePhase(tournamentState.phase);
   return Response.json({
     participants,
     phaseScores,
     tournamentState: {
-      phase: tournamentState.phase,
+      phase: currentPhase,
       status: tournamentState.status,
       totalParticipants: activeCount,
-      totalTables: Math.ceil(activeCount / 5),
-      maxPhases: phaseConfig.maxPhases,
-      semifinalPhase: phaseConfig.semifinalPhase,
-      finalPhase: phaseConfig.finalPhase,
-      isFinalPhase: tournamentState.phase >= phaseConfig.finalPhase,
-      semifinalCutoff: normalizeSemifinalCutoff(tournamentState.semifinal_cutoff),
-      finalCutoff: normalizeFinalCutoff(tournamentState.final_cutoff),
-      finalWildcardIds: normalizeWildcardIds(tournamentState.final_wildcard_ids),
+      totalTables: Math.ceil(activeCount / REMI13_RULES.tableSize),
+      maxPhases: REMI13_RULES.totalPhases,
+      shufflesPerPhase: REMI13_RULES.shufflesPerPhase,
+      targetParticipants: REMI13_RULES.targetParticipants,
+      tableSize: REMI13_RULES.tableSize,
+      semifinalPhase: LEGACY_SEMIFINAL_PHASE,
+      finalPhase: REMI13_RULES.totalPhases,
+      isFinalPhase: currentPhase >= REMI13_RULES.totalPhases,
+      semifinalCutoff: 20,
+      finalCutoff: REMI13_RULES.individualWinners,
+      finalWildcardIds: [],
     },
   });
 }
@@ -142,12 +112,24 @@ export async function POST(request: Request) {
         `UPDATE tournament_state
          SET phase = 1,
              status = 'waiting',
-             max_phases = 6,
-             semifinal_phase = 5,
-             final_phase = 6,
+             max_phases = $1,
+             semifinal_phase = $2,
+             final_phase = $3,
+             timer_status = 'idle',
+             timer_phase = 1,
+             timer_kocokan = 1,
+             timer_duration_seconds = $4,
+             timer_remaining_seconds = $4,
+             timer_started_at = NULL,
              final_wildcard_ids = '[]'::jsonb,
              updated_at = NOW()
-         WHERE id = 1`
+         WHERE id = 1`,
+        [
+          REMI13_RULES.totalPhases,
+          LEGACY_SEMIFINAL_PHASE,
+          REMI13_RULES.totalPhases,
+          REMI13_RULES.defaultKocokanDurationSeconds,
+        ]
       ),
     ]);
 
@@ -159,20 +141,22 @@ export async function POST(request: Request) {
         status: 'waiting',
         totalParticipants: 0,
         totalTables: 0,
-        maxPhases: 6,
-        semifinalPhase: 5,
-        finalPhase: 6,
+        maxPhases: REMI13_RULES.totalPhases,
+        shufflesPerPhase: REMI13_RULES.shufflesPerPhase,
+        targetParticipants: REMI13_RULES.targetParticipants,
+        tableSize: REMI13_RULES.tableSize,
+        semifinalPhase: LEGACY_SEMIFINAL_PHASE,
+        finalPhase: REMI13_RULES.totalPhases,
         isFinalPhase: false,
         semifinalCutoff: 20,
-        finalCutoff: 10,
+        finalCutoff: REMI13_RULES.individualWinners,
         finalWildcardIds: [],
       },
     });
   }
 
-  const { phase, status, maxPhases, semifinalCutoff, finalCutoff, semifinalPhase, finalPhase, finalWildcardIds } = body;
-  const phaseConfig = normalizePhaseConfig({ maxPhases, semifinalPhase, finalPhase });
-  const wildcardIds = normalizeWildcardIds(finalWildcardIds);
+  const phase = normalizePhase(body.phase);
+  const status = body.status === 'completed' ? 'completed' : body.status === 'in_progress' ? 'in_progress' : 'waiting';
 
   await query(
     `UPDATE tournament_state
@@ -189,12 +173,12 @@ export async function POST(request: Request) {
     [
       phase,
       status,
-      phaseConfig.maxPhases,
-      normalizeSemifinalCutoff(semifinalCutoff),
-      normalizeFinalCutoff(finalCutoff),
-      phaseConfig.semifinalPhase,
-      phaseConfig.finalPhase,
-      JSON.stringify(wildcardIds),
+      REMI13_RULES.totalPhases,
+      20,
+      REMI13_RULES.individualWinners,
+      LEGACY_SEMIFINAL_PHASE,
+      REMI13_RULES.totalPhases,
+      JSON.stringify([]),
     ]
   );
 

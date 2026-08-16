@@ -16,11 +16,20 @@ export interface TournamentState {
   totalParticipants: number;
   totalTables: number;
   maxPhases: number;
+  shufflesPerPhase: number;
+  targetParticipants: number;
+  tableSize: number;
+  /** @deprecated Kept for compatibility with older persisted clients. */
   semifinalPhase: number;
+  /** @deprecated Kept for compatibility with older persisted clients. */
   finalPhase: number;
+  /** @deprecated Kept for compatibility with older persisted clients. */
   isFinalPhase: boolean;
+  /** @deprecated Kept for compatibility with older persisted clients. */
   semifinalCutoff: 10 | 20;
+  /** @deprecated Kept for compatibility with older persisted clients. */
   finalCutoff: 5 | 10;
+  /** @deprecated Kept for compatibility with older persisted clients. */
   finalWildcardIds?: string[];
   finalTableA?: number[]; // Player ranks: 1, 3, 5, 7, 9
   finalTableB?: number[]; // Player ranks: 2, 4, 6, 8, 10

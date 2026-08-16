@@ -1,5 +1,6 @@
 import { PlayerScore, PhaseScore } from '@/app/player/types';
 import { query } from './db';
+import { LEGACY_SEMIFINAL_PHASE, REMI13_RULES } from './tournament-config';
 
 interface PlayerRow {
   id: string;
@@ -100,17 +101,14 @@ export async function updatePlayerPhaseScore(
      SET total_score = (
            SELECT COALESCE(SUM((phase_entry.value ->> 'points')::integer), 0)::integer
            FROM jsonb_each(scores || jsonb_build_object($1::text, $2::jsonb)) AS phase_entry(key, value)
-           WHERE phase_entry.key::integer < COALESCE(
-             (SELECT semifinal_phase FROM tournament_state WHERE id = 1),
-             5
-           )
+           WHERE phase_entry.key::integer < $4::integer
          ),
           matches_played = matches_played
             + CASE WHEN scores ? $1::text THEN 0 ELSE 1 END,
           scores = scores || jsonb_build_object($1::text, $2::jsonb),
          updated_at = NOW()
      WHERE id = $3`,
-    [String(phase), JSON.stringify(phaseScore), playerId]
+    [String(phase), JSON.stringify(phaseScore), playerId, LEGACY_SEMIFINAL_PHASE]
   );
 }
 
@@ -125,14 +123,11 @@ export async function wipePhaseScores(phase: number): Promise<void> {
          total_score = (
            SELECT COALESCE(SUM((phase_entry.value ->> 'points')::integer), 0)::integer
            FROM jsonb_each(scores - $1::text) AS phase_entry(key, value)
-           WHERE phase_entry.key::integer < COALESCE(
-             (SELECT semifinal_phase FROM tournament_state WHERE id = 1),
-             5
-           )
+           WHERE phase_entry.key::integer < $2::integer
          ),
          scores = scores - $1::text,
          updated_at = NOW()`,
-    [String(phase)]
+    [String(phase), LEGACY_SEMIFINAL_PHASE]
   );
 }
 
@@ -193,4 +188,4 @@ export async function syncFromAdminParticipants(
   );
 }
 
-export const MAX_PHASES = 6;
+export const MAX_PHASES = REMI13_RULES.totalPhases;

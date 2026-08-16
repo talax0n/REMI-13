@@ -4,9 +4,12 @@ import { motion } from 'framer-motion';
 import { Users } from 'lucide-react';
 import { Table } from './types';
 import { getTeamColor } from './team-style';
+import TournamentTimer from './TournamentTimer';
+import { TimerSnapshot } from '@/lib/timer';
 
 interface TablesScreenProps {
   tables: Table[];
+  timer: TimerSnapshot | null;
 }
 
 function getTeamStyle(team: string) {
@@ -21,7 +24,7 @@ function pickRows(n: number) {
   return 7;
 }
 
-export default function TablesScreen({ tables }: TablesScreenProps) {
+export default function TablesScreen({ tables, timer }: TablesScreenProps) {
   const realPlayerCount = tables.reduce(
     (acc, table) => acc + table.players.filter((player) => !player.isDummy).length,
     0
@@ -30,6 +33,7 @@ export default function TablesScreen({ tables }: TablesScreenProps) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[#0a0a0b] p-2 sm:p-4">
+      <TournamentTimer timer={timer} />
       {/* Header */}
       <header className="flex flex-wrap items-center justify-between gap-y-1 gap-x-3 mb-3 pb-2 border-b border-white/10">
         <div className="flex items-center gap-2 min-w-0">
@@ -37,7 +41,7 @@ export default function TablesScreen({ tables }: TablesScreenProps) {
           <h1 className="text-base sm:text-xl 2xl:text-3xl font-bold text-white">Tables</h1>
         </div>
         <div className="flex items-center gap-2 sm:gap-4 2xl:gap-6 text-[11px] sm:text-sm 2xl:text-lg">
-          <span className="text-zinc-500 whitespace-nowrap">{tables.length} Tables</span>
+          <span className="text-zinc-500 whitespace-nowrap">{tables.length} Tables · 5 seats</span>
           <span className="text-zinc-500 whitespace-nowrap">
             {realPlayerCount} Players
           </span>

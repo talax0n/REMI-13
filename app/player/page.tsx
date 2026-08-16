@@ -19,8 +19,9 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { PlayerScore, PlayerView, LoginFormData } from './types';
 import { getTeamColor } from '../components/team-style';
+import { REMI13_RULES } from '@/lib/tournament-config';
 
-const MAX_PHASES = 6;
+const MAX_PHASES = REMI13_RULES.totalPhases;
 
 function getTeamStyle(team: string) {
   return getTeamColor(team);
@@ -292,20 +293,15 @@ function PlayerProfile({
   player,
   onBack,
   tournamentPhase,
-  semifinalPhase,
 }: {
   player: PlayerScore;
   onBack: () => void;
   tournamentPhase: number;
-  semifinalPhase: number;
 }) {
   const teamStyle = getTeamStyle(player.team);
   const phases = Object.entries(player.scores).sort(([a], [b]) => parseInt(a) - parseInt(b));
   const completedPhases = phases.length;
-  const regularTotal = phases.reduce(
-    (sum, [phase, data]) => parseInt(phase) < semifinalPhase ? sum + data.points : sum,
-    0
-  );
+  const regularTotal = player.totalScore;
   
   return (
     <motion.div
@@ -389,7 +385,7 @@ function PlayerProfile({
               Babak Progress
             </h3>
             <span className="text-sm text-zinc-500">
-              {completedPhases}/{MAX_PHASES} completed
+              {completedPhases}/{MAX_PHASES} completed · {REMI13_RULES.shufflesPerPhase} kocokan/babak
             </span>
           </div>
           
@@ -448,7 +444,7 @@ function PlayerProfile({
                       {/* Phase Info */}
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold text-white leading-tight">Babak {phaseNum}</p>
+                          <p className="font-semibold text-white leading-tight">Babak {phaseNum} · {REMI13_RULES.shufflesPerPhase} kocokan</p>
                           {isCurrent && (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30">
                               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
@@ -530,7 +526,7 @@ function PlayerProfile({
               <p className="text-xl sm:text-2xl font-bold text-white tabular-nums truncate">
                 {regularTotal.toLocaleString()}
               </p>
-              <p className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider">Regular Points</p>
+              <p className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider">Total Nilai</p>
             </div>
           </div>
         </motion.div>
@@ -551,7 +547,6 @@ export default function PlayerPage() {
   const [loading, setLoading] = useState(false);
   const [allPlayers, setAllPlayers] = useState<PlayerScore[]>([]);
   const [tournamentPhase, setTournamentPhase] = useState(1);
-  const [semifinalPhase, setSemifinalPhase] = useState(5);
 
   // Poll tournament phase so the profile can highlight the active phase.
   useEffect(() => {
@@ -563,7 +558,6 @@ export default function PlayerPage() {
         const data = await res.json();
         if (!cancelled && data?.tournamentState?.phase) {
           setTournamentPhase(data.tournamentState.phase);
-          setSemifinalPhase(data.tournamentState.semifinalPhase ?? 5);
         }
       } catch {
         // ignore
@@ -663,7 +657,6 @@ export default function PlayerPage() {
           player={player}
           onBack={handleBack}
           tournamentPhase={tournamentPhase}
-          semifinalPhase={semifinalPhase}
         />
       )}
     </AnimatePresence>

@@ -22,10 +22,8 @@ import { toast } from 'sonner';
 interface ShuffleControlProps {
   state: TournamentState;
   targetPhase: number;
-  semifinalCutoff: 10 | 20;
   scoredSeatedCount: number;
   totalSeatedCount: number;
-  onSemifinalCutoffChange: (cutoff: 10 | 20) => void;
   onShuffle: (opts?: ShuffleOptions) => Promise<ShuffleResult>;
   onPhaseComplete: (targetPhase: number) => void;
 }
@@ -33,10 +31,8 @@ interface ShuffleControlProps {
 export default function ShuffleControl({
   state,
   targetPhase,
-  semifinalCutoff,
   scoredSeatedCount,
   totalSeatedCount,
-  onSemifinalCutoffChange,
   onShuffle,
   onPhaseComplete,
 }: ShuffleControlProps) {
@@ -86,10 +82,7 @@ export default function ShuffleControl({
   };
 
   const finishShuffle = (warnings: string[]) => {
-    const label =
-      targetPhase === state.semifinalPhase ? `Semifinal (Top ${semifinalCutoff})` :
-      targetPhase === state.finalPhase ? 'Final (Top 10: 8 meja + 2 wildcard)' :
-      `Babak ${targetPhase}`;
+    const label = `Babak ${targetPhase} · ${state.shufflesPerPhase} kocokan`;
     toast.success('Meja berhasil dibuat', {
       id: 'shuffle',
       description: `Meja untuk ${label} sudah siap.`,
@@ -265,41 +258,13 @@ export default function ShuffleControl({
               Konfirmasi Generate Meja
             </DialogTitle>
             <DialogDescription className="text-zinc-400">
-              {targetPhase === state.semifinalPhase
-                ? `Akan memilih ${semifinalCutoff} pemain teratas untuk Semifinal (Babak ${state.semifinalPhase}).`
-                : targetPhase === state.finalPhase
-                ? `Akan memilih 10 finalis untuk Final (Babak ${state.finalPhase}): Top 2 dari setiap meja semifinal (8) + 2 wildcard berdasarkan skor semifinal tertinggi dari sisa pemain.`
-                : `Akan men-shuffle meja untuk Babak ${targetPhase}.`}
+              {`Akan menyiapkan meja untuk Babak ${targetPhase}. Semua peserta tetap bermain; nilai babak ini akan dicatat setelah ${state.shufflesPerPhase} kocokan.`}
             </DialogDescription>
           </DialogHeader>
 
-          {targetPhase === state.semifinalPhase && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-zinc-300">Semifinal cutoff</p>
-              <div className="grid grid-cols-2 gap-2">
-                {[10, 20].map((cutoff) => (
-                  <Button
-                    key={cutoff}
-                    type="button"
-                    variant={semifinalCutoff === cutoff ? 'default' : 'outline'}
-                    onClick={() => onSemifinalCutoffChange(cutoff as 10 | 20)}
-                    className={semifinalCutoff === cutoff ? 'bg-blue-600 hover:bg-blue-500' : 'border-white/20 text-white hover:bg-white/10'}
-                  >
-                    Top {cutoff}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 my-4">
             <p className="text-sm text-yellow-400">
-              <strong>Peringatan:</strong>{' '}
-              {targetPhase === state.semifinalPhase
-                ? `Pemain di luar Top ${semifinalCutoff} akan dieliminasi.`
-                : targetPhase === state.finalPhase
-                ? 'Pemain di luar 10 finalis akan dieliminasi.'
-                : 'Semua penugasan meja saat ini akan diganti.'}
+              <strong>Catatan:</strong> Semua penugasan meja saat ini akan diganti. Tidak ada peserta yang dieliminasi.
             </p>
           </div>
 

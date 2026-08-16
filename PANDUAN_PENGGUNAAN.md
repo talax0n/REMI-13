@@ -35,18 +35,18 @@ Semua data tersimpan di server — setiap perubahan yang dilakukan admin langsun
 
 ## 2. Struktur Turnamen
 
-Turnamen terdiri dari **6 fase**:
+Turnamen terdiri dari **5 babak reguler**. Target peserta sekitar **60 orang**, dengan **5 peserta per meja** (sekitar 12 meja jika peserta tepat 60).
 
-| Fase | Nama           | Peserta                           |
-| ---- | -------------- | --------------------------------- |
-| 1    | Fase Reguler 1 | Semua peserta aktif               |
-| 2    | Fase Reguler 2 | Semua peserta aktif               |
-| 3    | Fase Reguler 3 | Semua peserta aktif               |
-| 4    | Fase Reguler 4 | Semua peserta aktif               |
-| 5    | Semifinal      | **Top 20** berdasarkan total skor |
-| 6    | Final          | **Top 10** berdasarkan total skor |
+| Aturan | Nilai |
+| --- | --- |
+| Babak | 5 babak |
+| Kocokan | 6 kocokan per babak |
+| Isi meja | 5 peserta, diusahakan berasal dari beberapa team |
+| Akumulasi | Nilai Babak 1–5 dijumlahkan |
+| Juara individu | 5 peserta dengan total nilai tertinggi |
+| Juara umum | Team dengan total nilai seluruh anggotanya paling tinggi |
 
-> **Catatan:** Setiap meja terdiri dari **5 pemain**. Sistem akan mengacak penempatan meja secara otomatis dengan memastikan anggota dari team yang sama tidak terlalu banyak duduk di meja yang sama.
+Tidak ada Semifinal atau Final. Semua peserta tetap bermain sampai Babak 5.
 
 ---
 
@@ -105,9 +105,8 @@ Setelah semua peserta terdaftar dan aktif, langkah berikutnya adalah **mengacak 
 2. Anda akan melihat informasi: jumlah peserta dan jumlah meja yang akan dibuat.
 3. Klik tombol biru **"Generate / Shuffle Tables"**.
 4. Sebuah dialog konfirmasi akan muncul:
-   - Untuk **Fase 1–3**: Konfirmasi pengacakan ulang semua penempatan meja.
-   - Untuk **Fase 4**: Peringatan bahwa ini akan memilih **top 20** untuk Semifinal.
-   - Untuk **Fase 5**: Peringatan bahwa ini akan memilih **top 10** untuk Final.
+   - Untuk setiap babak: konfirmasi pengacakan ulang semua penempatan meja.
+   - Semua peserta tetap aktif; tidak ada proses eliminasi.
 5. Klik **Konfirmasi** untuk melanjutkan.
 6. Sistem akan memproses dalam beberapa detik — meja akan muncul di tab **Penilaian Meja**.
 
@@ -122,7 +121,7 @@ Setelah satu fase selesai dimainkan, panitia mencatat skor di tab **Penilaian Me
 1. Klik tab **Penilaian Meja** di bagian atas halaman admin.
 2. Anda akan melihat semua meja dalam bentuk kartu (Meja 1, Meja 2, dst.).
 3. Klik salah satu **kartu meja** untuk membuka form penilaian.
-4. Untuk setiap pemain di meja tersebut, masukkan **skor fase ini** di kolom input.
+4. Setelah 6 kocokan selesai, masukkan **total nilai babak ini** untuk setiap pemain di meja tersebut.
 5. Klik tombol **Simpan Skor**.
 6. Ulangi untuk semua meja.
 
@@ -148,9 +147,7 @@ Berikut urutan kerja panitia untuk **setiap fase**:
 6. Ulangi dari langkah 2 untuk fase berikutnya
 ```
 
-Setelah **Fase 4** selesai dan di-shuffle ke Fase 5, sistem otomatis hanya mengambil **20 peserta dengan skor tertinggi**. Peserta lainnya otomatis dieliminasi.
-
-Setelah **Fase 5** selesai dan di-shuffle ke Fase 6, sistem otomatis hanya mengambil **10 peserta dengan skor tertinggi**.
+Nilai setiap babak disimpan terpisah dan otomatis dijumlahkan menjadi total nilai peserta. Setelah Babak 5 selesai, gunakan Top 5 individu dan peringkat total team sebagai hasil akhir.
 
 ---
 
@@ -174,7 +171,7 @@ Peserta dapat melihat skor dan peringkat mereka sendiri melalui halaman khusus.
 6. Peserta akan melihat:
    - Total skor kumulatif
    - Peringkat saat ini
-   - Rincian skor per fase (Fase 1 s/d 6)
+   - Rincian skor per babak (Babak 1 s/d 5)
    - Nomor meja di tiap fase
 
 ---
@@ -186,6 +183,8 @@ Halaman utama aplikasi (`/`) dapat ditampilkan di layar besar/proyektor untuk se
 ### Tampilan Leaderboard
 
 - Menampilkan **semua peserta** diurutkan dari skor tertinggi.
+- Menampilkan ringkasan **Top 5 individu** berdasarkan akumulasi Babak 1–5.
+- Tab **Team · Juara Umum** menampilkan total nilai setiap team dan team dengan nilai tertinggi.
 - Ikon khusus untuk peringkat 1, 2, 3 (mahkota, perak, perunggu).
 - **Update otomatis** setiap kali admin menyimpan skor baru — tidak perlu refresh halaman.
 

@@ -10,6 +10,7 @@
     "verify:shuffle-history": "node --no-warnings scripts/verify-shuffle-history.mjs"
   },
   "dependencies": {
+    "@lottiefiles/dotlottie-react": "^0.19.14",
     "@types/pg": "^8.20.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

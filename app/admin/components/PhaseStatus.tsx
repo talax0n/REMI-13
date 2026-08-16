@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Trophy, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Trophy, Clock, CheckCircle2, AlertCircle, Layers3, Users, Table2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -9,21 +9,6 @@ import { TournamentState } from '../types';
 
 interface PhaseStatusProps {
   state: TournamentState;
-  semifinalCutoff?: 10 | 20;
-  finalCutoff?: 5 | 10;
-}
-
-function getPhaseLabel(
-  phase: number,
-  semifinalPhase: number,
-  finalPhase: number,
-  semifinalCutoff = 20,
-  finalCutoff = 10,
-): string {
-  if (phase === finalPhase) return `Final (Top ${finalCutoff})`;
-  if (phase === semifinalPhase) return `Semifinal (Top ${semifinalCutoff})`;
-  if (phase < semifinalPhase) return `Babak Reguler ${phase}`;
-  return `Babak ${phase}`;
 }
 
 const statusConfig = {
@@ -47,7 +32,7 @@ const statusConfig = {
   },
 };
 
-export default function PhaseStatus({ state, semifinalCutoff, finalCutoff }: PhaseStatusProps) {
+export default function PhaseStatus({ state }: PhaseStatusProps) {
   const StatusIcon = statusConfig[state.status].icon;
   const progress = (state.phase / state.maxPhases) * 100;
 
@@ -71,9 +56,7 @@ export default function PhaseStatus({ state, semifinalCutoff, finalCutoff }: Pha
               <p className="text-sm text-zinc-500">Current Babak</p>
               <p className="text-2xl font-bold text-white">
                 Babak {state.phase}
-                <span className="text-base font-normal text-zinc-400 ml-2">
-                  {getPhaseLabel(state.phase, state.semifinalPhase, state.finalPhase, semifinalCutoff, finalCutoff)}
-                </span>
+                <span className="text-base font-normal text-zinc-400 ml-2">of {state.maxPhases}</span>
               </p>
             </div>
             <Badge 
@@ -87,7 +70,7 @@ export default function PhaseStatus({ state, semifinalCutoff, finalCutoff }: Pha
           {/* Progress Bar */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-zinc-500">Progress</span>
+            <span className="text-zinc-500">Progress · {state.shufflesPerPhase} kocokan/babak</span>
               <span className="text-zinc-400">{state.phase} / {state.maxPhases}</span>
             </div>
             <Progress 
@@ -97,14 +80,22 @@ export default function PhaseStatus({ state, semifinalCutoff, finalCutoff }: Pha
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 gap-3 pt-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
             <div className="bg-zinc-800/50 rounded-lg p-3">
-              <p className="text-sm text-zinc-500">Participants</p>
+              <p className="text-sm text-zinc-500 flex items-center gap-1"><Users className="w-3 h-3" /> Participants</p>
               <p className="text-xl font-bold text-white">{state.totalParticipants}</p>
             </div>
             <div className="bg-zinc-800/50 rounded-lg p-3">
-              <p className="text-sm text-zinc-500">Active Tables</p>
+              <p className="text-sm text-zinc-500 flex items-center gap-1"><Table2 className="w-3 h-3" /> Tables</p>
               <p className="text-xl font-bold text-white">{state.totalTables}</p>
+            </div>
+            <div className="bg-zinc-800/50 rounded-lg p-3">
+              <p className="text-sm text-zinc-500 flex items-center gap-1"><Layers3 className="w-3 h-3" /> Kocokan</p>
+              <p className="text-xl font-bold text-cyan-300">{state.shufflesPerPhase}</p>
+            </div>
+            <div className="bg-zinc-800/50 rounded-lg p-3">
+              <p className="text-sm text-zinc-500">Target peserta</p>
+              <p className="text-xl font-bold text-amber-300">±{state.targetParticipants}</p>
             </div>
           </div>
         </CardContent>

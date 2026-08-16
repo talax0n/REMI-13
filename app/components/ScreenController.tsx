@@ -1,28 +1,27 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, startTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Users, Maximize2, Minimize2 } from "lucide-react";
 import LeaderboardScreen from "./LeaderboardScreen";
 import TablesScreen from "./TablesScreen";
+import MaximizedTimerOverlay from "./MaximizedTimerOverlay";
 import { ScreenType, Player, Table } from "./types";
 import { PlayerScore } from "../player/types";
+import { TimerSnapshot } from "@/lib/timer";
 
-function getDisplayScore(score: PlayerScore, currentPhase: number, semifinalPhase: number) {
-  if (currentPhase < semifinalPhase) return score.totalScore;
-  return score.scores?.[currentPhase]?.points ?? 0;
+function getDisplayScore(score: PlayerScore) {
+  return score.totalScore;
 }
 
 function convertToPlayers(
   scores: PlayerScore[],
   currentPhase: number,
-  semifinalPhase: number,
   prevRanks: Map<string, number>,
-  wildcardIds: Set<string>,
 ): Player[] {
   const sortedScores = [...scores].sort((a, b) => {
-    const scoreA = getDisplayScore(a, currentPhase, semifinalPhase);
-    const scoreB = getDisplayScore(b, currentPhase, semifinalPhase);
+    const scoreA = getDisplayScore(a);
+    const scoreB = getDisplayScore(b);
     if (scoreB !== scoreA) return scoreB - scoreA;
     const tableA = a.currentTable ?? Number.MAX_SAFE_INTEGER;
     const tableB = b.currentTable ?? Number.MAX_SAFE_INTEGER;
@@ -34,13 +33,12 @@ function convertToPlayers(
     id: p.id,
     name: p.name,
     team: p.team,
-    score: getDisplayScore(p, currentPhase, semifinalPhase),
+    score: getDisplayScore(p),
     rank: index + 1,
     previousRank: prevRanks.get(p.id),
     status: p.status,
     currentTable: p.currentTable,
     currentPhaseScore: p.scores?.[currentPhase]?.points ?? 0,
-    finalWildcard: wildcardIds.has(p.id),
   }));
 }
 
@@ -50,8 +48,7 @@ export default function ScreenController() {
   const [playerScores, setPlayerScores] = useState<PlayerScore[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [currentPhase, setCurrentPhase] = useState(1);
-  const [semifinalPhase, setSemifinalPhase] = useState(5);
-  const [finalWildcardIds, setFinalWildcardIds] = useState<string[]>([]);
+  const [timer, setTimer] = useState<TimerSnapshot | null>(null);
 
   // Fetch current tournament phase on mount, then poll every 5s
   useEffect(() => {
@@ -61,9 +58,8 @@ export default function ScreenController() {
         const res = await fetch("/api/admin");
         const data = await res.json();
         if (!cancelled && data.tournamentState?.phase) {
-          setCurrentPhase(data.tournamentState.phase);
-          setSemifinalPhase(data.tournamentState.semifinalPhase ?? 5);
-          setFinalWildcardIds(data.tournamentState.finalWildcardIds ?? []);
+          // Low priority: never let this delay the timer's own 1s re-render.
+          startTransition(() => setCurrentPhase(data.tournamentState.phase));
         }
       } catch {
         // ignore
@@ -71,6 +67,26 @@ export default function ScreenController() {
     }
     fetchPhase();
     const interval = setInterval(fetchPhase, 5000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
+  // Poll the persisted timer snapshot. The timer component interpolates the
+  // countdown locally between polls so multiple display screens stay aligned
+  // without opening a long-lived database connection.
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchTimer() {
+      try {
+        const res = await fetch("/api/timer", { cache: "no-store" });
+        if (!res.ok) return;
+        const data: TimerSnapshot = await res.json();
+        if (!cancelled) setTimer(data);
+      } catch {
+        // keep the last good timer snapshot visible
+      }
+    }
+    fetchTimer();
+    const interval = setInterval(fetchTimer, 5000);
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
@@ -84,7 +100,9 @@ export default function ScreenController() {
         if (!res.ok) return;
         const data: PlayerScore[] = await res.json();
         if (!cancelled && Array.isArray(data)) {
-          setPlayerScores(data);
+          // Low priority: the animated 60-row leaderboard re-render is heavy
+          // enough to stall the timer's tick if it runs at normal priority.
+          startTransition(() => setPlayerScores(data));
         }
       } catch {
         // keep the last good snapshot visible
@@ -104,7 +122,9 @@ export default function ScreenController() {
         if (!res.ok) return;
         const data: Table[] = await res.json();
         if (!cancelled && Array.isArray(data)) {
-          setTables(data);
+          // Same reasoning as the player poll above — keep this off the
+          // timer's render priority.
+          startTransition(() => setTables(data));
         }
       } catch {
         // keep the last good snapshot visible
@@ -117,13 +137,12 @@ export default function ScreenController() {
 
   const displayTables = tables;
   const prevRanksRef = useRef<Map<string, number>>(new Map());
-  const wildcardIdSet = useMemo(() => new Set(finalWildcardIds), [finalWildcardIds]);
   const players = useMemo(
     // Ref holds the prior poll's ranks so we can render previousRank diffs;
     // it is only updated from the effect below, not during render.
     // eslint-disable-next-line react-hooks/refs
-    () => convertToPlayers(playerScores, currentPhase, semifinalPhase, prevRanksRef.current, wildcardIdSet),
-    [currentPhase, playerScores, semifinalPhase, wildcardIdSet]
+    () => convertToPlayers(playerScores, currentPhase, prevRanksRef.current),
+    [currentPhase, playerScores]
   );
   useEffect(() => {
     const next = new Map<string, number>();
@@ -148,6 +167,7 @@ export default function ScreenController() {
 
   return (
     <div className="h-dvh flex flex-col bg-[#0a0a0b] relative">
+      <MaximizedTimerOverlay timer={timer} />
       {/* Mobile top bar — centered logo + name */}
       <header className="sm:hidden h-14 flex items-center justify-center gap-2 px-4 border-b border-white/5 bg-[#0a0a0b] shrink-0">
         <img src="/LOGO.png" alt="Remi 13 Logo" className="w-7 h-7 rounded-lg object-contain shrink-0" />
@@ -230,7 +250,7 @@ export default function ScreenController() {
               transition={{ duration: 0.2 }}
               className="min-h-full sm:h-full"
             >
-              <LeaderboardScreen players={players} currentPhase={currentPhase} />
+              <LeaderboardScreen players={players} currentPhase={currentPhase} timer={timer} />
             </motion.div>
           )}
           {currentScreen === "tables" && (
@@ -242,7 +262,7 @@ export default function ScreenController() {
               transition={{ duration: 0.2 }}
               className="min-h-full sm:h-full"
             >
-              <TablesScreen tables={displayTables} />
+              <TablesScreen tables={displayTables} timer={timer} />
             </motion.div>
           )}
         </AnimatePresence>

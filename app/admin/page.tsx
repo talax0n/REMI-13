@@ -8,7 +8,8 @@ import ParticipantForm from './components/ParticipantForm';
 import BulkImportUploader from './components/BulkImportUploader';
 import ParticipantTable from './components/ParticipantTable';
 import PhaseStatus from './components/PhaseStatus';
-import PhaseConfig from './components/PhaseConfig';
+import TournamentRulesCard from './components/TournamentRulesCard';
+import TimerControl from './components/TimerControl';
 import TableScoring from './components/TableScoring';
 import PlayerQRCode from './components/PlayerQRCode';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,7 @@ import {
   Participant as EngineParticipant,
 } from '@/lib/shuffle-engine';
 import { recordTableOpponentHistory } from '@/lib/opponent-history';
+import { LEGACY_SEMIFINAL_PHASE, REMI13_RULES } from '@/lib/tournament-config';
 
 export type ShuffleTiebreakInfo = {
   phaseLabel: string;
@@ -57,73 +59,12 @@ export type ShuffleOptions = {
   resolvedTiebreakers?: Record<string, string[]>;
 };
 
-function resolveCutoffSelection<T extends { id: string; name: string; team: string; matchesPlayed: number }>(
-  sorted: T[],
-  scoreOf: (p: T) => number,
-  cutoff: number,
-  phaseLabel: string,
-  tiebreakerIds: string[] | undefined,
-): { selected: T[]; tiebreak?: ShuffleTiebreakInfo } {
-  if (sorted.length <= cutoff) {
-    return { selected: sorted.slice(0, cutoff) };
-  }
-
-  const boundaryScore = scoreOf(sorted[cutoff - 1]);
-  const guaranteed = sorted.filter((p) => scoreOf(p) > boundaryScore);
-  const tied = sorted.filter((p) => scoreOf(p) === boundaryScore);
-  const slotsRemaining = cutoff - guaranteed.length;
-
-  if (tied.length <= slotsRemaining) {
-    return { selected: sorted.slice(0, cutoff) };
-  }
-
-  if (!tiebreakerIds || tiebreakerIds.length !== slotsRemaining) {
-    return {
-      selected: [],
-      tiebreak: {
-        phaseLabel,
-        cutoff,
-        tiedScore: boundaryScore,
-        guaranteedCount: guaranteed.length,
-        slotsRemaining,
-        candidates: tied.map((p) => ({
-          id: p.id,
-          name: p.name,
-          team: p.team,
-          score: scoreOf(p),
-          matchesPlayed: p.matchesPlayed,
-        })),
-      },
-    };
-  }
-
-  const tiedIds = new Set(tied.map((p) => p.id));
-  const validSelected = tiebreakerIds.filter((id) => tiedIds.has(id));
-  if (validSelected.length !== slotsRemaining) {
-    throw new Error(
-      `Pilih tepat ${slotsRemaining} pemain dari ${tied.length} pemain dengan skor ${boundaryScore}.`
-    );
-  }
-  const selectedSet = new Set(validSelected);
-  const selectedTied = tied.filter((p) => selectedSet.has(p.id));
-  return { selected: [...guaranteed, ...selectedTied] };
-}
-
-function getPhaseAwareScore(
-  participant: AdminParticipant,
-  phaseScores: Record<string, Record<number, number>>,
-  phase: number,
-  semifinalPhase: number
-) {
-  if (phase < semifinalPhase) return participant.score;
-  return phaseScores[participant.id]?.[phase] ?? 0;
+function getPhaseAwareScore(participant: AdminParticipant) {
+  return participant.score;
 }
 
 function buildTablesFromParticipants(
-  parts: AdminParticipant[],
-  phaseScores: Record<string, Record<number, number>> = {},
-  phase = 1,
-  semifinalPhase = 5
+  parts: AdminParticipant[]
 ): Table[] {
   const active = parts.filter((p) => p.status === 'active' && p.tableNumber !== undefined);
   const byTable = new Map<number, AdminParticipant[]>();
@@ -138,12 +79,12 @@ function buildTablesFromParticipants(
       id: `table-${num}`,
       number: num,
       players: [...players]
-        .sort((a, b) => getPhaseAwareScore(b, phaseScores, phase, semifinalPhase) - getPhaseAwareScore(a, phaseScores, phase, semifinalPhase))
+        .sort((a, b) => getPhaseAwareScore(b) - getPhaseAwareScore(a))
         .map((p, i): Player => ({
           id: p.id,
           name: p.name,
           team: p.team,
-          score: getPhaseAwareScore(p, phaseScores, phase, semifinalPhase),
+          score: getPhaseAwareScore(p),
           rank: i + 1,
           status: p.status,
         }))
@@ -206,9 +147,12 @@ export default function AdminPage() {
     status: 'waiting',
     totalParticipants: 0,
     totalTables: 0,
-    maxPhases: 6,
-    semifinalPhase: 5,
-    finalPhase: 6,
+    maxPhases: REMI13_RULES.totalPhases,
+    shufflesPerPhase: REMI13_RULES.shufflesPerPhase,
+    targetParticipants: REMI13_RULES.targetParticipants,
+    tableSize: REMI13_RULES.tableSize,
+    semifinalPhase: LEGACY_SEMIFINAL_PHASE,
+    finalPhase: REMI13_RULES.totalPhases,
     isFinalPhase: false,
     semifinalCutoff: 20,
     finalCutoff: 10,
@@ -229,8 +173,6 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const [phaseScores, setPhaseScores] = useState<Record<string, Record<number, number>>>({});
-  const [semifinalCutoff, setSemifinalCutoff] = useState<10 | 20>(20);
-  const [finalCutoff, setFinalCutoff] = useState<5 | 10>(10);
   // Tracks whether the initial DB load has been applied.
   // The sync useEffect must not fire for that first setParticipants call —
   // the DB already has correct state; syncing would unnecessarily overwrite tables.
@@ -261,26 +203,16 @@ export default function AdminPage() {
     ? Math.min(tournamentState.phase + 1, tournamentState.maxPhases)
     : tournamentState.phase;
 
-  const persistTournamentState = useCallback((
-    next: TournamentState,
-    nextSemifinalCutoff = semifinalCutoff,
-    nextFinalCutoff = finalCutoff
-  ) => {
+  const persistTournamentState = useCallback((next: TournamentState) => {
     fetch('/api/admin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         phase: next.phase,
         status: next.status,
-        maxPhases: next.maxPhases,
-        semifinalPhase: next.semifinalPhase,
-        finalPhase: next.finalPhase,
-        semifinalCutoff: nextSemifinalCutoff,
-        finalCutoff: nextFinalCutoff,
-        finalWildcardIds: next.finalWildcardIds ?? [],
       }),
     }).catch(console.error);
-  }, [finalCutoff, semifinalCutoff]);
+  }, []);
 
   // Apply server state without re-triggering the local sync push effect.
   const applyServerState = useCallback((data: {
@@ -296,8 +228,6 @@ export default function AdminPage() {
       finalWildcardIds: data.tournamentState.finalWildcardIds ?? [],
     });
     setPhaseScores(data.phaseScores ?? {});
-    setSemifinalCutoff(data.tournamentState.semifinalCutoff ?? 20);
-    setFinalCutoff(data.tournamentState.finalCutoff ?? 10);
     requestAnimationFrame(() => { syncEnabled.current = wasEnabled; });
   }, []);
 
@@ -365,7 +295,7 @@ export default function AdminPage() {
     setTournamentState((prev) => ({
       ...prev,
       totalParticipants: activeParticipants.length,
-      totalTables: Math.ceil(activeParticipants.length / 5),
+      totalTables: Math.ceil(activeParticipants.length / REMI13_RULES.tableSize),
     }));
   }, [participants]);
 
@@ -385,7 +315,7 @@ export default function AdminPage() {
       setTournamentState((prev) => ({
         ...prev,
         totalParticipants: nextParticipants.filter((p) => p.status === 'active').length,
-        totalTables: Math.ceil(nextParticipants.filter((p) => p.status === 'active').length / 5),
+        totalTables: Math.ceil(nextParticipants.filter((p) => p.status === 'active').length / REMI13_RULES.tableSize),
       }));
     },
     [participants]
@@ -414,14 +344,14 @@ export default function AdminPage() {
       setTournamentState((prev) => ({
         ...prev,
         totalParticipants: activeCount,
-        totalTables: Math.ceil(activeCount / 5),
+        totalTables: Math.ceil(activeCount / REMI13_RULES.tableSize),
       }));
     },
     [participants]
   );
 
   // Shuffle tables
-  const handleShuffle = useCallback(async (opts?: ShuffleOptions): Promise<ShuffleResult> => {
+  const handleShuffle = useCallback(async (): Promise<ShuffleResult> => {
     // Stamp early so polling cooldown covers the 1.5s UI delay + state update + sync POSTs.
     // Without this, a poll firing mid-shuffle can overwrite the new layout with stale DB rows.
     lastLocalMutationAt.current = Date.now();
@@ -429,175 +359,8 @@ export default function AdminPage() {
     lastLocalMutationAt.current = Date.now();
     const participantsWithCurrentHistory = recordTableOpponentHistory(participants);
 
-    // Final phase → 4 semifinal tables × top 2 by semifinal phase score + 2 wildcards
-    // (highest semifinal phase score among players not selected as table-top-2).
-    if (shuffleTargetPhase === tournamentState.finalPhase) {
-      const finalScoreOf = (p: AdminParticipant) =>
-        getPhaseAwareScore(p, phaseScores, tournamentState.semifinalPhase, tournamentState.semifinalPhase);
-
-      const semifinalists = participantsWithCurrentHistory.filter((p) => p.status === 'active');
-      if (semifinalists.length < 10) {
-        throw new Error('Butuh minimal 10 pemain aktif untuk babak final');
-      }
-
-      const byTable = new Map<number, AdminParticipant[]>();
-      for (const p of semifinalists) {
-        if (p.tableNumber === undefined) continue;
-        const list = byTable.get(p.tableNumber) ?? [];
-        list.push(p);
-        byTable.set(p.tableNumber, list);
-      }
-      const tableNumbers = Array.from(byTable.keys()).sort((a, b) => a - b);
-      for (const tn of tableNumbers) {
-        byTable.get(tn)!.sort((a, b) => finalScoreOf(b) - finalScoreOf(a));
-      }
-
-      const resolved = opts?.resolvedTiebreakers ?? {};
-      const tableQualifiers: AdminParticipant[] = [];
-      const remaining: AdminParticipant[] = [];
-
-      for (const tn of tableNumbers) {
-        const arr = byTable.get(tn)!;
-        const label = `Final · Meja ${tn} (Top 2)`;
-        const cut = Math.min(2, arr.length);
-        const res = resolveCutoffSelection(arr, finalScoreOf, cut, label, resolved[label]);
-        if (res.tiebreak) {
-          return { warnings: [], tiebreak: res.tiebreak };
-        }
-        tableQualifiers.push(...res.selected);
-        const picked = new Set(res.selected.map((p) => p.id));
-        for (const p of arr) if (!picked.has(p.id)) remaining.push(p);
-      }
-
-      remaining.sort((a, b) => finalScoreOf(b) - finalScoreOf(a));
-      const wildcardLabel = 'Final · Wildcard (Top 2)';
-      const wildcardCut = Math.min(2, remaining.length, 10 - tableQualifiers.length);
-      const wildcardRes = resolveCutoffSelection(
-        remaining,
-        finalScoreOf,
-        wildcardCut,
-        wildcardLabel,
-        resolved[wildcardLabel],
-      );
-      if (wildcardRes.tiebreak) {
-        return { warnings: [], tiebreak: wildcardRes.tiebreak };
-      }
-      const wildcards = wildcardRes.selected;
-      const finalists = [...tableQualifiers, ...wildcards];
-      const wildcardIdSet = new Set(wildcards.map((p) => p.id));
-
-      const engineParticipants: EngineParticipant[] = finalists.map((p) => ({
-        id: p.id,
-        name: p.name,
-        team: p.team,
-        score: finalScoreOf(p),
-        opponents: new Set(p.opponents ?? []),
-      }));
-
-      const shuffleResult = engineGenerateTables(engineParticipants);
-      const tableGroups = shuffleResult.tables;
-      updateOpponents(tableGroups);
-
-      const tableNumberMap = new Map<string, number>();
-      const opponentsMap = new Map<string, string[]>();
-      tableGroups.forEach((group, i) => {
-        group.forEach((p) => {
-          tableNumberMap.set(p.id, i + 1);
-          opponentsMap.set(p.id, Array.from(p.opponents));
-        });
-      });
-
-      const updated = participantsWithCurrentHistory.map((p) => {
-        const tableNum = tableNumberMap.get(p.id);
-        if (tableNum) {
-          return {
-            ...p,
-            tableNumber: tableNum,
-            opponents: opponentsMap.get(p.id) ?? p.opponents,
-            eliminatedAtPhase: undefined,
-          };
-        }
-        if (p.status === 'active') return { ...p, status: 'eliminated' as const, tableNumber: undefined, eliminatedAtPhase: tournamentState.semifinalPhase };
-        return p;
-      });
-
-      setParticipants(updated);
-      setTournamentState((prev) => ({
-        ...prev,
-        isFinalPhase: true,
-        totalTables: Math.ceil(finalists.length / 5),
-        finalTableA: undefined,
-        finalTableB: undefined,
-        finalWildcardIds: Array.from(wildcardIdSet),
-      }));
-      return { warnings: shuffleResult.warnings };
-    }
-
-    // Semifinal phase → top N (cutoff-defined semifinalists)
-    if (shuffleTargetPhase === tournamentState.semifinalPhase) {
-      const semifinalScoreOf = (p: AdminParticipant) => p.score;
-      const sorted = [...participantsWithCurrentHistory]
-        .filter((p) => p.status === 'active')
-        .sort((a, b) => semifinalScoreOf(b) - semifinalScoreOf(a));
-
-      if (sorted.length < semifinalCutoff) {
-        throw new Error(`Butuh minimal ${semifinalCutoff} pemain aktif untuk babak semifinal`);
-      }
-
-      const semifinalLabel = `Semifinal (Top ${semifinalCutoff})`;
-      const resolution = resolveCutoffSelection(
-        sorted,
-        semifinalScoreOf,
-        semifinalCutoff,
-        semifinalLabel,
-        opts?.resolvedTiebreakers?.[semifinalLabel],
-      );
-      if (resolution.tiebreak) {
-        return { warnings: [], tiebreak: resolution.tiebreak };
-      }
-      const semifinalists = resolution.selected;
-
-      const engineParticipants: EngineParticipant[] = semifinalists.map((p) => ({
-        id: p.id,
-        name: p.name,
-        team: p.team,
-        score: p.score,
-        opponents: new Set(p.opponents ?? []),
-      }));
-
-      const shuffleResult = engineGenerateTables(engineParticipants);
-      const tableGroups = shuffleResult.tables;
-      updateOpponents(tableGroups);
-
-      const tableNumberMap = new Map<string, number>();
-      const opponentsMap = new Map<string, string[]>();
-      tableGroups.forEach((group, i) => {
-        group.forEach((p) => {
-          tableNumberMap.set(p.id, i + 1);
-          opponentsMap.set(p.id, Array.from(p.opponents));
-        });
-      });
-
-      const updated = participantsWithCurrentHistory.map((p) => {
-        if (p.status !== 'active') return p;
-        const tableNum = tableNumberMap.get(p.id);
-        if (tableNum !== undefined) {
-          return {
-            ...p,
-            tableNumber: tableNum,
-            opponents: opponentsMap.get(p.id) ?? p.opponents,
-          };
-        }
-        // Outside semifinal cutoff → eliminated at last regular phase
-        return { ...p, status: 'eliminated' as const, tableNumber: undefined, eliminatedAtPhase: Math.max(1, tournamentState.semifinalPhase - 1) };
-      });
-
-      setParticipants(updated);
-      return { warnings: shuffleResult.warnings };
-    }
-
-    // Phases 1–4 → regular reshuffle. Unpaid/inactive players stay on the roster
-    // but are excluded from pairing.
+    // Every babak uses the same 5-seat mixed-team table shuffle. Participants
+    // remain active throughout the five cumulative babak.
     const allActive = participantsWithCurrentHistory
       .filter((p) => p.status === 'active')
       .sort((a, b) => b.score - a.score);
@@ -619,7 +382,9 @@ export default function AdminPage() {
     } catch {
       const pool = [...engineParticipants].sort(() => Math.random() - 0.5);
       tableGroups = [];
-      for (let i = 0; i < pool.length; i += 5) tableGroups.push(pool.slice(i, i + 5));
+      for (let i = 0; i < pool.length; i += REMI13_RULES.tableSize) {
+        tableGroups.push(pool.slice(i, i + REMI13_RULES.tableSize));
+      }
       warnings = ['Mesin pairing utama gagal; sistem memakai fallback acak dan tetap menyimpan riwayat lawan.'];
     }
     updateOpponents(tableGroups);
@@ -645,16 +410,23 @@ export default function AdminPage() {
 
     setParticipants(updated);
     return { warnings };
-  }, [participants, phaseScores, semifinalCutoff, shuffleTargetPhase, tournamentState.finalPhase, tournamentState.semifinalPhase]);
+  }, [participants]);
 
   // Mark generated phase as active.
   const handlePhaseComplete = useCallback((targetPhase: number) => {
+    fetch('/api/admin/timer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reset', phase: targetPhase, kocokan: 1 }),
+    }).catch(() => {
+      // The timer can still be reset manually from the timer card.
+    });
     setTournamentState((prev) => {
       const next = {
         ...prev,
         phase: targetPhase,
         status: 'in_progress' as TournamentState['status'],
-        isFinalPhase: targetPhase >= prev.finalPhase,
+        isFinalPhase: targetPhase >= REMI13_RULES.totalPhases,
       };
       persistTournamentState(next);
       return next;
@@ -662,8 +434,7 @@ export default function AdminPage() {
   }, [persistTournamentState]);
 
   // Full rollback to previous phase: wipe phase X scores (DB + state), subtract
-  // their cumulative contribution from p.score, clear table assignments, and
-  // restore players eliminated by a shuffle at phase X or later.
+  // their cumulative contribution from p.score, and clear table assignments.
   const handlePhaseBack = useCallback(async () => {
     const wipedPhase = tournamentState.phase;
     if (wipedPhase <= 1) {
@@ -671,6 +442,14 @@ export default function AdminPage() {
       return;
     }
     const newPhase = wipedPhase - 1;
+
+    fetch('/api/admin/timer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reset', phase: newPhase, kocokan: 1 }),
+    }).catch(() => {
+      // The timer can still be reset manually from the timer card.
+    });
 
     // Block polling overwrite while the wipe is in flight.
     lastLocalMutationAt.current = Date.now();
@@ -692,13 +471,11 @@ export default function AdminPage() {
     }
 
     setTournamentState((prev) => {
-      const clearWildcards = wipedPhase >= prev.finalPhase;
       const next = {
         ...prev,
         phase: newPhase,
         status: 'waiting' as TournamentState['status'],
-        isFinalPhase: newPhase >= prev.finalPhase,
-        finalWildcardIds: clearWildcards ? [] : prev.finalWildcardIds,
+        isFinalPhase: false,
       };
       persistTournamentState(next);
       return next;
@@ -717,27 +494,23 @@ export default function AdminPage() {
       return next;
     });
 
-    const isRegularPhase = wipedPhase < tournamentState.semifinalPhase;
     setParticipants((prev) => prev.map((p) => {
       const wipedScore = phaseScores[p.id]?.[wipedPhase];
       const hadScore = wipedScore !== undefined;
 
-      let next: AdminParticipant = { ...p, tableNumber: undefined };
-      if (isRegularPhase && hadScore) {
-        next.score = Math.max(0, p.score - wipedScore);
-        next.matchesPlayed = Math.max(0, p.matchesPlayed - 1);
-      }
-
-      // Restore players eliminated by a shuffle into wipedPhase or later.
-      if (next.status === 'eliminated' && (next.eliminatedAtPhase ?? 0) >= newPhase) {
-        const { eliminatedAtPhase: _eliminated, ...rest } = next;
-        next = { ...rest, status: 'active' as const };
-      }
+      const next: AdminParticipant = hadScore
+        ? {
+            ...p,
+            tableNumber: undefined,
+            score: Math.max(0, p.score - wipedScore),
+            matchesPlayed: Math.max(0, p.matchesPlayed - 1),
+          }
+        : { ...p, tableNumber: undefined };
       return next;
     }));
 
     setShowPhaseBackWarning(false);
-  }, [persistTournamentState, phaseScores, tournamentState.phase, tournamentState.semifinalPhase]);
+  }, [persistTournamentState, phaseScores, tournamentState.phase]);
 
   // Reset all scores (set all participant scores to 0)
   const handleResetAllScores = useCallback(async () => {
@@ -764,40 +537,6 @@ export default function AdminPage() {
     window.location.href = '/api/admin/tables/export';
   }, []);
 
-  const handleSemifinalCutoffChange = useCallback((cutoff: 10 | 20) => {
-    setSemifinalCutoff(cutoff);
-    setTournamentState((prev) => {
-      const next = { ...prev, semifinalCutoff: cutoff };
-      persistTournamentState(next, cutoff, finalCutoff);
-      return next;
-    });
-  }, [finalCutoff, persistTournamentState]);
-
-  const handlePhaseConfigChange = useCallback((
-    maxPhases: number,
-    semifinalPhase: number,
-    finalPhase: number,
-  ) => {
-    const safeMax = Math.max(2, Math.floor(maxPhases));
-    const safeFinal = Math.min(safeMax, Math.max(2, Math.floor(finalPhase)));
-    const safeSemifinal = Math.min(safeFinal - 1, Math.max(1, Math.floor(semifinalPhase)));
-    setTournamentState((prev) => {
-      const next: TournamentState = {
-        ...prev,
-        maxPhases: safeMax,
-        semifinalPhase: safeSemifinal,
-        finalPhase: safeFinal,
-        phase: Math.min(prev.phase, safeMax),
-        isFinalPhase: prev.phase >= safeFinal,
-      };
-      persistTournamentState(next);
-      return next;
-    });
-    toast.success('Konfigurasi babak tersimpan', {
-      description: `Total ${safeMax} babak · Semifinal di Babak ${safeSemifinal} · Final di Babak ${safeFinal}.`,
-    });
-  }, [persistTournamentState]);
-
   const handleResetDatabase = useCallback(async () => {
     const response = await fetch('/api/admin', {
       method: 'POST',
@@ -813,8 +552,6 @@ export default function AdminPage() {
     const data = await response.json();
     setParticipants(data.participants);
     setTournamentState(data.tournamentState);
-    setSemifinalCutoff(data.tournamentState.semifinalCutoff ?? 20);
-    setFinalCutoff(data.tournamentState.finalCutoff ?? 10);
     setPhaseScores({});
     setShowResetWarning(false);
 
@@ -855,7 +592,7 @@ export default function AdminPage() {
     setTournamentState((prev) => ({
       ...prev,
       totalParticipants: activeCount,
-      totalTables: Math.ceil(activeCount / 5),
+      totalTables: Math.ceil(activeCount / REMI13_RULES.tableSize),
     }));
     toast.success(
       deletedCount === 1 ? 'Participant deleted' : `${deletedCount} participants deleted`
@@ -936,7 +673,7 @@ export default function AdminPage() {
       prev.map((p) => {
         const update = updates.find((u) => u.id === p.id);
         if (!update) return p;
-        const isRegularPhase = update.phase < tournamentState.semifinalPhase;
+        const isRegularPhase = true;
         
         // Calculate the change from previous score for this phase
         const previousScore = phaseScores[update.id]?.[update.phase];
@@ -961,7 +698,7 @@ export default function AdminPage() {
     });
     
     updateTournamentStats();
-  }, [participants, phaseScores, tournamentState.semifinalPhase, updateTournamentStats]);
+  }, [participants, phaseScores, updateTournamentStats]);
 
   // Sync participants to player store and push tables to display whenever participants change.
   // Skipped for the initial DB load (syncEnabled is false at that point).
@@ -970,12 +707,7 @@ export default function AdminPage() {
     lastLocalMutationAt.current = Date.now();
     isSyncingRef.current = true;
     const sync = async () => {
-      const tables = buildTablesFromParticipants(
-        participants,
-        phaseScores,
-        tournamentState.phase,
-        tournamentState.semifinalPhase
-      );
+      const tables = buildTablesFromParticipants(participants);
       const fetches: Promise<unknown>[] = [
         fetch('/api/player', {
           method: 'POST',
@@ -1215,16 +947,13 @@ export default function AdminPage() {
               <div className="lg:col-span-4 space-y-6">
                 <PhaseStatus
                   state={tournamentState}
-                  semifinalCutoff={semifinalCutoff}
-                  finalCutoff={finalCutoff}
                 />
+                <TimerControl currentPhase={tournamentState.phase} />
                 <ShuffleControl
                   state={tournamentState}
                   targetPhase={shuffleTargetPhase}
-                  semifinalCutoff={semifinalCutoff}
                   scoredSeatedCount={seatedActiveScoredCount}
                   totalSeatedCount={seatedActiveParticipants.length}
-                  onSemifinalCutoffChange={handleSemifinalCutoffChange}
                   onShuffle={handleShuffle}
                   onPhaseComplete={handlePhaseComplete}
                 />
@@ -1256,13 +985,7 @@ export default function AdminPage() {
                     </div>
                   </button>
                   <div className="sm:col-span-2">
-                    <PhaseConfig
-                      maxPhases={tournamentState.maxPhases}
-                      semifinalPhase={tournamentState.semifinalPhase}
-                      finalPhase={tournamentState.finalPhase}
-                      currentPhase={tournamentState.phase}
-                      onChange={handlePhaseConfigChange}
-                    />
+                    <TournamentRulesCard />
                   </div>
                 </div>
               </div>
@@ -1284,7 +1007,7 @@ export default function AdminPage() {
             <TableScoring
               currentPhase={tournamentState.phase}
               phaseScores={phaseScores}
-              accumulatesScores={tournamentState.phase < tournamentState.semifinalPhase}
+              accumulatesScores
               onSaveScores={handleSaveScores}
             />
           )}
@@ -1340,12 +1063,7 @@ export default function AdminPage() {
       <PlayerQRCode 
         isOpen={showQRCode} 
         onClose={() => setShowQRCode(false)} 
-        tables={buildTablesFromParticipants(
-          participants,
-          phaseScores,
-          tournamentState.phase,
-          tournamentState.semifinalPhase
-        )}
+        tables={buildTablesFromParticipants(participants)}
       />
 
       {/* Phase Back Warning Dialog */}

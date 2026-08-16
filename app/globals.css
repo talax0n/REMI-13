@@ -4,6 +4,21 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@keyframes leaderboard-scroll {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+.animate-leaderboard-scroll {
+  animation-name: leaderboard-scroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

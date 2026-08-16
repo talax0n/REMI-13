@@ -1,4 +1,5 @@
 import { Pool, QueryResultRow } from 'pg';
+import { LEGACY_SEMIFINAL_PHASE, REMI13_RULES } from './tournament-config';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -67,15 +68,27 @@ async function runMigration(): Promise<void> {
         max_phases INTEGER NOT NULL DEFAULT 5,
         semifinal_cutoff INTEGER NOT NULL DEFAULT 20,
         final_cutoff INTEGER NOT NULL DEFAULT 10,
-        semifinal_phase INTEGER NOT NULL DEFAULT 5,
-        final_phase INTEGER NOT NULL DEFAULT 6,
+        semifinal_phase INTEGER NOT NULL DEFAULT 6,
+        final_phase INTEGER NOT NULL DEFAULT 5,
+        timer_status TEXT NOT NULL DEFAULT 'idle',
+        timer_phase INTEGER NOT NULL DEFAULT 1,
+        timer_kocokan INTEGER NOT NULL DEFAULT 1,
+        timer_duration_seconds INTEGER NOT NULL DEFAULT 900,
+        timer_remaining_seconds INTEGER NOT NULL DEFAULT 900,
+        timer_started_at TIMESTAMPTZ,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
-
-      INSERT INTO tournament_state (id, phase, status, max_phases)
-      VALUES (1, 1, 'waiting', 6)
-      ON CONFLICT (id) DO NOTHING;
     `);
+
+    // Keep the parameterized statement separate from the multi-command DDL
+    // above. PostgreSQL does not allow multiple commands in a prepared
+    // statement, which node-postgres uses whenever query parameters are passed.
+    await client.query(
+      `INSERT INTO tournament_state (id, phase, status, max_phases)
+       VALUES (1, 1, 'waiting', $1)
+       ON CONFLICT (id) DO NOTHING`,
+      [REMI13_RULES.totalPhases]
+    );
 
     await client.query(`
       DO $$
@@ -115,6 +128,48 @@ async function runMigration(): Promise<void> {
           ALTER TABLE tournament_state ADD COLUMN final_wildcard_ids JSONB NOT NULL DEFAULT '[]'::jsonb;
         END IF;
 
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'tournament_state' AND column_name = 'timer_status'
+        ) THEN
+          ALTER TABLE tournament_state ADD COLUMN timer_status TEXT NOT NULL DEFAULT 'idle';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'tournament_state' AND column_name = 'timer_phase'
+        ) THEN
+          ALTER TABLE tournament_state ADD COLUMN timer_phase INTEGER NOT NULL DEFAULT 1;
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'tournament_state' AND column_name = 'timer_kocokan'
+        ) THEN
+          ALTER TABLE tournament_state ADD COLUMN timer_kocokan INTEGER NOT NULL DEFAULT 1;
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'tournament_state' AND column_name = 'timer_duration_seconds'
+        ) THEN
+          ALTER TABLE tournament_state ADD COLUMN timer_duration_seconds INTEGER NOT NULL DEFAULT 900;
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'tournament_state' AND column_name = 'timer_remaining_seconds'
+        ) THEN
+          ALTER TABLE tournament_state ADD COLUMN timer_remaining_seconds INTEGER NOT NULL DEFAULT 900;
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'tournament_state' AND column_name = 'timer_started_at'
+        ) THEN
+          ALTER TABLE tournament_state ADD COLUMN timer_started_at TIMESTAMPTZ;
+        END IF;
+
         IF EXISTS (
           SELECT 1 FROM information_schema.columns
           WHERE table_name = 'players' AND column_name = 'church'
@@ -135,6 +190,19 @@ async function runMigration(): Promise<void> {
         END IF;
       END $$;
     `);
+
+    // The competition format is now fixed: five cumulative regular phases,
+    // with no semifinal or final elimination stage. Keep the legacy columns
+    // internally so older score rows and clients remain readable.
+    await client.query(
+      `UPDATE tournament_state
+       SET max_phases = $1,
+           semifinal_phase = $2,
+           final_phase = $3,
+           updated_at = NOW()
+       WHERE id = 1`,
+      [REMI13_RULES.totalPhases, LEGACY_SEMIFINAL_PHASE, REMI13_RULES.totalPhases]
+    );
   } finally {
     client.release();
   }

@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { getTeamColor } from '../../components/team-style';
 import { Table, Player } from '../../components/types';
 import { PlayerScore } from '../../player/types';
+import { REMI13_RULES } from '@/lib/tournament-config';
 
 interface TableScoringProps {
   currentPhase: number;
@@ -233,7 +234,7 @@ export default function TableScoring({
         <div className="flex items-center justify-between px-1">
           <div>
             <h2 className="text-xl font-bold text-white">Table Scoring</h2>
-            <p className="text-sm text-zinc-500">Tap a table to input scores</p>
+            <p className="text-sm text-zinc-500">Input total nilai setelah {REMI13_RULES.shufflesPerPhase} kocokan · nilai otomatis terakumulasi</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -439,7 +440,7 @@ export default function TableScoring({
                     </span>
                     <div className="mt-2 flex items-center gap-2">
                       <span className="text-xs text-zinc-500">
-                        {accumulatesScores ? 'Saved Total:' : 'Saved Babak:'}
+                        Total kumulatif:
                       </span>
                       <span className="text-sm font-mono text-zinc-400">
                         {(accumulatesScores ? dbScore : storedPhasePoints ?? 0).toLocaleString()}
@@ -449,7 +450,7 @@ export default function TableScoring({
 
                   <div className="flex flex-col items-end gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-zinc-500">Babak {currentPhase}</span>
+                      <span className="text-xs text-zinc-500">Babak {currentPhase} · {REMI13_RULES.shufflesPerPhase} kocokan</span>
                       <Input
                         type="text"
                         inputMode="text"
@@ -472,7 +473,7 @@ export default function TableScoring({
                     </div>
                     <div className="text-right">
                       <span className="text-xs text-zinc-500">
-                        {accumulatesScores ? 'Total ' : 'Babak '}
+                        Total setelah disimpan
                       </span>
                       <span className={`text-lg font-black tabular-nums ${hasPendingChange ? 'text-amber-300' : hasNewScore ? 'text-emerald-400' : 'text-zinc-400'}`}>
                         {projectedScore.toLocaleString()}
