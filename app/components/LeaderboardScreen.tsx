@@ -197,23 +197,29 @@ function AutoScrollPlayersLayout({ players }: { players: Player[] }) {
   const shouldScroll = overflowing && !reduceMotion;
   const duration = Math.max(MIN_SCROLL_SECONDS, players.length * SECONDS_PER_ROW);
 
+  const gridClass = 'grid grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-2 2xl:grid-cols-3';
+
   return (
     <div ref={containerRef} className="relative min-h-0 flex-1 overflow-hidden">
       <div className={shouldScroll ? 'h-full overflow-hidden' : 'h-full overflow-y-auto'}>
         <div
-          ref={contentRef}
-          className={`grid grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-2 2xl:grid-cols-3 ${
-            shouldScroll ? 'animate-leaderboard-scroll' : ''
-          }`}
+          className={shouldScroll ? 'flex flex-col animate-leaderboard-scroll' : ''}
           style={shouldScroll ? { animationDuration: `${duration}s` } : undefined}
         >
-          {players.map((player, index) => (
-            <CompactLeaderboardRow key={player.id} player={player} index={index} />
-          ))}
-          {shouldScroll &&
-            players.map((player, index) => (
-              <CompactLeaderboardRow key={`loop-${player.id}`} player={player} index={index} />
+          {/* Measured single copy — the duplicate below is a separate block
+              so a wrapped row never splices ranks from both copies together. */}
+          <div ref={contentRef} className={gridClass}>
+            {players.map((player, index) => (
+              <CompactLeaderboardRow key={player.id} player={player} index={index} />
             ))}
+          </div>
+          {shouldScroll && (
+            <div className={gridClass} aria-hidden="true">
+              {players.map((player, index) => (
+                <CompactLeaderboardRow key={`loop-${player.id}`} player={player} index={index} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -240,7 +246,8 @@ function getTeamStandings(players: Player[]): TeamStanding[] {
 }
 
 function WinnerSummary({ players }: { players: Player[] }) {
-  const topFive = players.slice(0, REMI13_RULES.individualWinners);
+  const hasScores = players.some((player) => player.score > 0);
+  const topFive = hasScores ? players.slice(0, REMI13_RULES.individualWinners) : [];
 
   return (
     <section className="mb-4 shrink-0 rounded-xl border border-amber-400/20 bg-gradient-to-b from-amber-400/[0.07] to-transparent p-3 sm:p-4">
@@ -283,7 +290,7 @@ function WinnerSummary({ players }: { players: Player[] }) {
           );
         })}
         {topFive.length === 0 && (
-          <p className="col-span-full px-2 py-3 text-xs text-zinc-500">Menunggu nilai masuk — skor akan muncul di sini.</p>
+          <p className="col-span-full px-2 py-3 text-xs text-zinc-500">Menunggu skor masuk</p>
         )}
       </div>
     </section>

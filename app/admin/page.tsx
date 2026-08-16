@@ -744,13 +744,20 @@ export default function AdminPage() {
 
   return (
     <div className="h-dvh flex flex-col bg-[#0B0F1A] overflow-y-auto">
-      <Toaster 
-        position="top-right" 
+      <Toaster
+        position="top-right"
+        richColors
+        closeButton
         toastOptions={{
           style: {
             background: '#1c1c1e',
-            border: '1px solid rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.14)',
             color: '#fafafa',
+            boxShadow: '0 12px 32px -8px rgba(0,0,0,0.55)',
+          },
+          classNames: {
+            title: 'text-sm font-semibold',
+            description: '!text-zinc-300 text-xs',
           },
         }}
       />

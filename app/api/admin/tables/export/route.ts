@@ -178,13 +178,13 @@ function addTableScoreSheet(
   });
 
   worksheet.columns = [
-    { key: 'table', width: 8 },
-    { key: 'shuffle', width: 10 },
-    { key: 'player1', width: 22 },
-    { key: 'player2', width: 22 },
-    { key: 'player3', width: 22 },
-    { key: 'player4', width: 22 },
-    { key: 'player5', width: 22 },
+    { key: 'table', width: 16 },
+    { key: 'shuffle', width: 18 },
+    { key: 'player1', width: 40 },
+    { key: 'player2', width: 40 },
+    { key: 'player3', width: 40 },
+    { key: 'player4', width: 40 },
+    { key: 'player5', width: 40 },
   ];
 
   worksheet.mergeCells('A1:G1');
@@ -192,24 +192,24 @@ function addTableScoreSheet(
   worksheet.getCell('A1').value = 'Remi 13 - DS Cileungsi - Table Pairings';
   worksheet.getCell('A2').value = `Phase ${phase} • Generated ${generatedAt}`;
 
-  worksheet.getRow(1).height = 28;
-  worksheet.getRow(2).height = 24;
-  worksheet.getCell('A1').font = { bold: true, size: 18 };
+  worksheet.getRow(1).height = 44;
+  worksheet.getRow(2).height = 34;
+  worksheet.getCell('A1').font = { bold: true, size: 28 };
   worksheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
-  worksheet.getCell('A2').font = { bold: true, size: 12 };
+  worksheet.getCell('A2').font = { bold: true, size: 18 };
   worksheet.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' };
 
   const players = table.players.slice(0, 5);
   const headerRow = worksheet.getRow(3);
   headerRow.values = ['Table', 'Shuffle', ...players.map((player) => player.name)];
-  headerRow.height = 22;
+  headerRow.height = 44;
   const teamRow = worksheet.getRow(4);
   teamRow.values = ['', '', ...players.map((player) => player.team)];
-  teamRow.height = 18;
+  teamRow.height = 30;
 
   for (let column = 1; column <= 7; column += 1) {
-    styleScoreHeaderCell(headerRow.getCell(column), column <= 2 ? 11 : 12);
-    styleScoreHeaderCell(teamRow.getCell(column), 8);
+    styleScoreHeaderCell(headerRow.getCell(column), column <= 2 ? 20 : 22);
+    styleScoreHeaderCell(teamRow.getCell(column), 15);
   }
   worksheet.mergeCells('A3:A4');
   worksheet.mergeCells('B3:B4');
@@ -217,16 +217,17 @@ function addTableScoreSheet(
   for (let i = 0; i < SCORE_SHEET_SHUFFLES; i += 1) {
     const row = worksheet.getRow(5 + i);
     row.values = [table.number, i + 1, '', '', '', '', ''];
-    row.height = 22;
+    row.height = 46;
+    row.font = { size: 18 };
     row.alignment = { horizontal: 'center', vertical: 'middle' };
   }
 
-  worksheet.getRow(12).height = 22;
+  worksheet.getRow(12).height = 46;
   worksheet.mergeCells('A13:B13');
   const totalRow = worksheet.getRow(13);
-  totalRow.height = 22;
+  totalRow.height = 46;
   worksheet.getCell('A13').value = 'Total Score';
-  worksheet.getCell('A13').font = { bold: true, size: 12 };
+  worksheet.getCell('A13').font = { bold: true, size: 20 };
   worksheet.getCell('A13').alignment = { horizontal: 'center', vertical: 'middle' };
 
   for (let row = 3; row <= 13; row += 1) {
