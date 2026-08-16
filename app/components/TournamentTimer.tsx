@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
-import { CheckCircle2, Pause, Play, TimerReset } from 'lucide-react';
+import { CheckCircle2, Maximize2, Pause, Play, TimerReset } from 'lucide-react';
 import { getRemainingTimerSeconds, TimerSnapshot } from '@/lib/timer';
 import { REMI13_RULES } from '@/lib/tournament-config';
 import { SuitPip } from './suit-pip';
@@ -24,33 +24,83 @@ function getSynchronizedRemaining(timer: TimerSnapshot | null): number {
   return getRemainingTimerSeconds(timer, Date.now() + serverOffset);
 }
 
-export default function TournamentTimer({ timer }: { timer: TimerSnapshot | null }) {
-  const [remaining, setRemaining] = useState(() => getSynchronizedRemaining(timer));
+interface Phase {
+  isRunning: boolean;
+  isUrgent: boolean;
+  isFinished: boolean;
+  isPaused: boolean;
+}
+
+function derivePhase(timer: TimerSnapshot | null, remaining: number): Phase {
+  const isRunning = timer?.status === 'running' && remaining > 0;
+  return {
+    isRunning,
+    isUrgent: isRunning && remaining <= 60,
+    isFinished: timer?.status === 'finished' || (timer?.status === 'running' && remaining === 0),
+    isPaused: timer?.status === 'paused',
+  };
+}
+
+function samePhase(a: Phase, b: Phase) {
+  return a.isRunning === b.isRunning && a.isUrgent === b.isUrgent && a.isFinished === b.isFinished && a.isPaused === b.isPaused;
+}
+
+export default function TournamentTimer({
+  timer,
+  onExpand,
+}: {
+  timer: TimerSnapshot | null;
+  onExpand?: () => void;
+}) {
   const timerRef = useRef<TimerSnapshot | null>(timer);
+  const digitRef = useRef<HTMLDivElement>(null);
+  const ringRef = useRef<SVGCircleElement>(null);
+  const initialPhase = derivePhase(timer, getSynchronizedRemaining(timer));
+  const phaseRef = useRef<Phase>(initialPhase);
   const reduceMotion = useReducedMotion();
+  const [initialDisplay] = useState(() => formatTime(getSynchronizedRemaining(timer)));
+  const [initialDashOffset] = useState(() => {
+    const remaining = getSynchronizedRemaining(timer);
+    const fraction = timer && timer.durationSeconds > 0 ? Math.min(1, Math.max(0, remaining / timer.durationSeconds)) : 0;
+    return RING_CIRCUMFERENCE * (1 - fraction);
+  });
+  const [phase, setPhase] = useState<Phase>(() => initialPhase);
 
   useEffect(() => {
-    // Keep the ticker aligned with the latest server snapshot without
-    // recreating the one-second interval whenever the parent polls.
     timerRef.current = timer;
   }, [timer]);
 
   useEffect(() => {
-    let timeout: number | undefined;
+    // The countdown text and ring are written straight to the DOM, bypassing
+    // React state/render entirely for the hot path. The absolute timestamp is
+    // checked each animation frame, so a 5-second API poll can never become
+    // the display cadence.
+    let frame = 0;
+    let lastRemaining = -1;
 
-    // Schedule against the next wall-clock second. This keeps the visible
-    // countdown at one-second boundaries even though server snapshots arrive
-    // less often and avoids accumulating interval drift.
     const tick = () => {
-      setRemaining(getSynchronizedRemaining(timerRef.current));
-      const delay = 1000 - (Date.now() % 1000);
-      timeout = window.setTimeout(tick, delay);
+      const current = timerRef.current;
+      const remaining = getSynchronizedRemaining(current);
+
+      if (remaining !== lastRemaining) {
+        lastRemaining = remaining;
+        if (digitRef.current) digitRef.current.textContent = formatTime(remaining);
+        if (ringRef.current) {
+          const fraction = current && current.durationSeconds > 0 ? Math.min(1, Math.max(0, remaining / current.durationSeconds)) : 0;
+          ringRef.current.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - fraction));
+        }
+      }
+
+      const next = derivePhase(current, remaining);
+      if (!samePhase(phaseRef.current, next)) {
+        phaseRef.current = next;
+        setPhase(next);
+      }
+      frame = window.requestAnimationFrame(tick);
     };
 
     tick();
-    return () => {
-      if (timeout !== undefined) window.clearTimeout(timeout);
-    };
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   if (!timer) {
@@ -64,15 +114,9 @@ export default function TournamentTimer({ timer }: { timer: TimerSnapshot | null
     );
   }
 
-  const isRunning = timer.status === 'running' && remaining > 0;
-  const isUrgent = isRunning && remaining <= 60;
-  const isFinished = timer.status === 'finished' || (timer.status === 'running' && remaining === 0);
-  const isPaused = timer.status === 'paused';
+  const { isRunning, isUrgent, isFinished, isPaused } = phase;
   const Icon = isFinished ? CheckCircle2 : isRunning ? Play : isPaused ? Pause : TimerReset;
   const statusLabel = isFinished ? 'Waktu habis' : isRunning ? 'Sedang berjalan' : isPaused ? 'Paused' : 'Belum dimulai';
-
-  const fraction = timer.durationSeconds > 0 ? Math.min(1, Math.max(0, remaining / timer.durationSeconds)) : 0;
-  const dashOffset = RING_CIRCUMFERENCE * (1 - fraction);
   const ringColor = isUrgent
     ? 'stroke-rose-400'
     : isRunning
@@ -100,6 +144,7 @@ export default function TournamentTimer({ timer }: { timer: TimerSnapshot | null
             <svg viewBox="0 0 36 36" className="absolute inset-0 h-11 w-11 -rotate-90 sm:h-12 sm:w-12">
               <circle cx="18" cy="18" r={RING_RADIUS} className="fill-none stroke-white/[0.08]" strokeWidth="2.5" />
               <circle
+                ref={ringRef}
                 cx="18"
                 cy="18"
                 r={RING_RADIUS}
@@ -107,7 +152,7 @@ export default function TournamentTimer({ timer }: { timer: TimerSnapshot | null
                 strokeLinecap="round"
                 className={`fill-none ${ringColor} ${reduceMotion ? '' : 'transition-[stroke-dashoffset] duration-1000 ease-linear'}`}
                 strokeDasharray={RING_CIRCUMFERENCE}
-                strokeDashoffset={isFinished ? 0 : dashOffset}
+                strokeDashoffset={initialDashOffset}
               />
             </svg>
             <Icon className={`h-4 w-4 sm:h-[18px] sm:w-[18px] ${isUrgent ? 'text-rose-300' : isRunning ? 'text-amber-200' : isFinished ? 'text-emerald-300' : 'text-zinc-400'}`} />
@@ -124,38 +169,46 @@ export default function TournamentTimer({ timer }: { timer: TimerSnapshot | null
           </div>
         </div>
         <div
+          ref={digitRef}
           className={`shrink-0 font-[family-name:var(--font-space-grotesk)] text-3xl font-black leading-none tracking-tight tabular-nums sm:text-4xl ${
             isUrgent ? 'text-rose-200' : isRunning ? 'text-white' : 'text-zinc-300'
           }`}
         >
-          {formatTime(remaining)}
+          {initialDisplay}
         </div>
+        {onExpand && (isRunning || isPaused) && (
+          <button
+            type="button"
+            onClick={onExpand}
+            aria-label="Perbesar timer"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0b]"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
+        )}
       </section>
 
       {isFinished && (
-        <TimesUpCard
-          key={`${timer.phase}-${timer.kocokan}`}
-          kocokan={timer.kocokan}
-          reduceMotion={!!reduceMotion}
-        />
+        <TimesUpCard key={`${timer.phase}-${timer.kocokan}`} reduceMotion={!!reduceMotion} />
       )}
     </>
   );
 }
 
-function TimesUpCard({ reduceMotion }: { kocokan: number; reduceMotion: boolean }) {
+function TimesUpCard({ reduceMotion }: { reduceMotion: boolean }) {
   return (
     <div
       aria-label="Time's up"
       aria-live="assertive"
       role="alertdialog"
-      className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center p-6"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#09090b]/80 p-6 backdrop-blur-sm"
     >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(244,63,94,0.16),transparent_60%)]" />
       <motion.div
         initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.92 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: reduceMotion ? 0.15 : 0.4, ease: [0, 0, 0.2, 1] }}
-        className="flex flex-col items-center text-center"
+        className="relative flex flex-col items-center text-center"
       >
         <div className="h-48 w-48 sm:h-64 sm:w-64">
           <DotLottieReact
@@ -165,8 +218,8 @@ function TimesUpCard({ reduceMotion }: { kocokan: number; reduceMotion: boolean 
             className="h-full w-full"
           />
         </div>
-        <h2 className="font-[family-name:var(--font-space-grotesk)] text-4xl font-black tracking-tight text-white [text-shadow:0_2px_24px_rgba(0,0,0,0.85)] sm:text-5xl">
-          Time&apos;s up
+        <h2 className="font-[family-name:var(--font-space-grotesk)] text-4xl font-black tracking-tight text-white sm:text-5xl">
+          Waktu Habis
         </h2>
       </motion.div>
     </div>

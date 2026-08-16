@@ -27,7 +27,14 @@ export default function TimerControl({ currentPhase }: TimerControlProps) {
   const [durationMinutes, setDurationMinutes] = useState('15');
   const [now, setNow] = useState(() => Date.now());
   const [savingAction, setSavingAction] = useState<string | null>(null);
+  const timerRef = useRef<TimerSnapshot | null>(timer);
+  const digitRef = useRef<HTMLParagraphElement>(null);
+  const [initialDisplay] = useState(() => formatTime(timer ? getRemainingTimerSeconds(timer) : 0));
   const durationInitialized = useRef(false);
+
+  useEffect(() => {
+    timerRef.current = timer;
+  }, [timer]);
 
   const fetchTimer = useCallback(async () => {
     try {
@@ -46,13 +53,36 @@ export default function TimerControl({ currentPhase }: TimerControlProps) {
 
   useEffect(() => {
     fetchTimer();
-    const poll = window.setInterval(fetchTimer, 3000);
+    const poll = window.setInterval(fetchTimer, 1000);
     const tick = window.setInterval(() => setNow(Date.now()), 1000);
     return () => {
       window.clearInterval(poll);
       window.clearInterval(tick);
     };
   }, [fetchTimer]);
+
+  useEffect(() => {
+    let frame = 0;
+    let lastRemaining = -1;
+
+    const tick = () => {
+      const remaining = timerRef.current
+        ? getRemainingTimerSeconds(
+            timerRef.current,
+            Date.now() + (Date.parse(timerRef.current.serverNow) - Date.now()),
+          )
+        : 0;
+
+      if (remaining !== lastRemaining) {
+        lastRemaining = remaining;
+        if (digitRef.current) digitRef.current.textContent = formatTime(remaining);
+      }
+      frame = window.requestAnimationFrame(tick);
+    };
+
+    tick();
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   const isSaving = savingAction !== null;
 
@@ -115,8 +145,17 @@ export default function TimerControl({ currentPhase }: TimerControlProps) {
     sendAction('start', { kocokan: timer.kocokan + 1, reset: true });
   };
 
+  const resetToFirstKocokan = () => {
+    if (!timer || timer.kocokan === 1) return;
+    const confirmed = window.confirm(
+      `Reset Babak ${timer.phase} dari Kocokan ${timer.kocokan} ke Kocokan 1? Timer akan berhenti dan durasi kembali penuh.`,
+    );
+    if (!confirmed) return;
+    sendAction('reset', { kocokan: 1 });
+  };
+
   return (
-    <section className="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
+    <section className="min-w-0 overflow-hidden rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <p className="flex items-center gap-2 text-sm font-semibold text-white">
@@ -129,8 +168,8 @@ export default function TimerControl({ currentPhase }: TimerControlProps) {
         </span>
       </div>
 
-      <div className="mb-3 flex flex-col items-center gap-3 rounded-lg border border-white/[0.07] bg-zinc-950/30 px-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:py-3">
-        <div className="flex items-center gap-3">
+      <div className="mb-3 flex min-w-0 flex-col gap-3 rounded-lg border border-white/[0.07] bg-zinc-950/30 px-3 py-3">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="relative flex h-16 w-16 shrink-0 items-center justify-center">
             <svg viewBox="0 0 64 64" className="absolute inset-0 h-16 w-16 -rotate-90">
               <circle cx="32" cy="32" r={RING_RADIUS} className="fill-none stroke-white/[0.08]" strokeWidth="3" />
@@ -149,24 +188,24 @@ export default function TimerControl({ currentPhase }: TimerControlProps) {
               {timer ? Math.round(fraction * 100) : 0}%
             </span>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-zinc-500">
               <SuitPip index={(timer?.kocokan ?? 1) - 1} className="text-xs leading-none" />
               Babak {currentPhase} · Kocokan {timer?.kocokan ?? 1}/{REMI13_RULES.shufflesPerPhase}
             </p>
-            <p className="font-[family-name:var(--font-space-grotesk)] text-4xl font-black tabular-nums text-white">
-              {formatTime(remaining)}
+            <p ref={digitRef} className="font-[family-name:var(--font-space-grotesk)] text-4xl font-black tabular-nums text-white">
+              {initialDisplay}
             </p>
           </div>
         </div>
 
-        <div className="grid w-full grid-cols-3 gap-1.5 sm:w-auto sm:flex sm:items-center">
+        <div className="grid grid-cols-3 gap-2">
           <Button
             type="button"
             variant="outline"
             onClick={() => sendAction('start', { reset: false })}
             disabled={isRunning || isSaving}
-            className="border-white/10 text-white hover:bg-white/10"
+            className="h-10 border-white/10 text-white hover:bg-white/10"
             aria-label="Start timer"
           >
             <Play className="mr-1.5 h-3.5 w-3.5" /> Start
@@ -176,7 +215,7 @@ export default function TimerControl({ currentPhase }: TimerControlProps) {
             variant="outline"
             onClick={() => sendAction('pause')}
             disabled={!isRunning || isSaving}
-            className="border-white/10 text-white hover:bg-white/10"
+            className="h-10 border-white/10 text-white hover:bg-white/10"
             aria-label="Pause timer"
           >
             <Pause className="mr-1.5 h-3.5 w-3.5" /> Pause
@@ -186,7 +225,7 @@ export default function TimerControl({ currentPhase }: TimerControlProps) {
             variant="outline"
             onClick={() => sendAction('reset')}
             disabled={isSaving}
-            className="border-white/10 text-white hover:bg-white/10"
+            className="h-10 border-white/10 text-white hover:bg-white/10"
             aria-label="Reset kocokan"
           >
             <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Reset
@@ -194,8 +233,8 @@ export default function TimerControl({ currentPhase }: TimerControlProps) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-        <label className="flex-1 text-xs text-zinc-500">
+      <div className="flex flex-col gap-2">
+        <label className="text-xs text-zinc-500">
           Durasi tiap kocokan (menit)
           <Input
             type="number"
@@ -203,16 +242,17 @@ export default function TimerControl({ currentPhase }: TimerControlProps) {
             max={120}
             value={durationMinutes}
             onChange={(event) => setDurationMinutes(event.target.value)}
-            className="mt-1 h-9 border-white/10 bg-zinc-950/30 text-white"
+            className="mt-1 h-9 w-full border-white/10 bg-zinc-950/30 text-white"
           />
         </label>
+        <div className="flex flex-wrap gap-2">
         <Button
           type="button"
           variant="outline"
           onClick={() => sendAction('set')}
           disabled={isRunning || isSaving}
           title={isRunning ? 'Pause atau reset timer dulu untuk mengubah durasi' : undefined}
-          className="h-9 border-white/10 text-white hover:bg-white/10 disabled:opacity-40"
+          className="h-9 shrink-0 border-white/10 text-white hover:bg-white/10 disabled:opacity-40"
         >
           <Check className="mr-1.5 h-3.5 w-3.5" /> Set
         </Button>
@@ -220,10 +260,20 @@ export default function TimerControl({ currentPhase }: TimerControlProps) {
           type="button"
           onClick={nextKocokan}
           disabled={!timer || timer.kocokan >= REMI13_RULES.shufflesPerPhase || isSaving}
-          className="h-9 bg-amber-500 text-amber-950 hover:bg-amber-400 disabled:opacity-40"
+          className="h-9 flex-1 bg-amber-500 text-amber-950 hover:bg-amber-400 disabled:opacity-40"
         >
           <SkipForward className="mr-1.5 h-4 w-4" /> Next &amp; Start
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={resetToFirstKocokan}
+          disabled={!timer || timer.kocokan === 1 || isSaving}
+          className="h-9 shrink-0 border-rose-400/25 text-rose-200 hover:bg-rose-400/10 disabled:opacity-40"
+        >
+          Reset ke 1/6
+        </Button>
+        </div>
       </div>
       <p className="mt-2 text-[10px] text-zinc-500">
         Set menyimpan durasi tanpa menjalankan timer. Next &amp; Start memakai durasi di atas, pindah ke kocokan

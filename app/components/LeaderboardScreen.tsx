@@ -14,6 +14,7 @@ interface LeaderboardScreenProps {
   players: Player[];
   currentPhase?: number;
   timer: TimerSnapshot | null;
+  onExpandTimer?: () => void;
 }
 
 function getTeamStyle(team: string) {
@@ -358,7 +359,7 @@ function TeamStandings({ players }: { players: Player[] }) {
   );
 }
 
-export default function LeaderboardScreen({ players, currentPhase = 1, timer }: LeaderboardScreenProps) {
+export default function LeaderboardScreen({ players, currentPhase = 1, timer, onExpandTimer }: LeaderboardScreenProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'individual' | 'teams'>('individual');
@@ -383,7 +384,7 @@ export default function LeaderboardScreen({ players, currentPhase = 1, timer }: 
 
   return (
     <div className="flex flex-col p-2 sm:p-4 bg-[#0a0a0b] sm:h-full sm:overflow-hidden">
-      <TournamentTimer timer={timer} />
+      <TournamentTimer timer={timer} onExpand={onExpandTimer} />
       {/* Header */}
       <header className="flex flex-wrap items-center justify-between gap-y-1 gap-x-3 mb-3 pb-2 border-b border-white/10 shrink-0">
         <div className="flex items-center gap-2 min-w-0">

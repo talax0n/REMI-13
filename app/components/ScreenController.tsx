@@ -49,6 +49,8 @@ export default function ScreenController() {
   const [tables, setTables] = useState<Table[]>([]);
   const [currentPhase, setCurrentPhase] = useState(1);
   const [timer, setTimer] = useState<TimerSnapshot | null>(null);
+  const [timerMaximized, setTimerMaximized] = useState(false);
+  const autoShownKeyRef = useRef<string | null>(null);
 
   // Fetch current tournament phase on mount, then poll every 5s
   useEffect(() => {
@@ -70,9 +72,9 @@ export default function ScreenController() {
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
-  // Poll the persisted timer snapshot. The timer component interpolates the
-  // countdown locally between polls so multiple display screens stay aligned
-  // without opening a long-lived database connection.
+  // Sync the persisted timer snapshot every second. The timer component still
+  // interpolates from startedAt locally between responses, so the displayed
+  // countdown never depends on the network response cadence.
   useEffect(() => {
     let cancelled = false;
     async function fetchTimer() {
@@ -86,9 +88,22 @@ export default function ScreenController() {
       }
     }
     fetchTimer();
-    const interval = setInterval(fetchTimer, 5000);
+    const interval = setInterval(fetchTimer, 1000);
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
+
+  // Every fresh "start" (a new phase/kocokan/startedAt combination) takes
+  // over the screen once, automatically. Closing it doesn't touch this ref,
+  // so it won't re-open until the next real start — the viewer can still
+  // bring it back manually via the compact timer's maximize button.
+  useEffect(() => {
+    if (timer?.status !== 'running') return;
+    const key = `${timer.phase}-${timer.kocokan}-${timer.startedAt ?? ''}`;
+    if (autoShownKeyRef.current !== key) {
+      autoShownKeyRef.current = key;
+      setTimerMaximized(true);
+    }
+  }, [timer]);
 
   // Poll player scores. Avoid long-lived SSE DB polling; repeated display tabs can
   // exhaust small hosted Postgres session limits and leave the screen empty.
@@ -167,7 +182,11 @@ export default function ScreenController() {
 
   return (
     <div className="h-dvh flex flex-col bg-[#0a0a0b] relative">
-      <MaximizedTimerOverlay timer={timer} />
+      <MaximizedTimerOverlay
+        timer={timer}
+        visible={timerMaximized}
+        onClose={() => setTimerMaximized(false)}
+      />
       {/* Mobile top bar — centered logo + name */}
       <header className="sm:hidden h-14 flex items-center justify-center gap-2 px-4 border-b border-white/5 bg-[#0a0a0b] shrink-0">
         <img src="/LOGO.png" alt="Remi 13 Logo" className="w-7 h-7 rounded-lg object-contain shrink-0" />
@@ -250,7 +269,12 @@ export default function ScreenController() {
               transition={{ duration: 0.2 }}
               className="min-h-full sm:h-full"
             >
-              <LeaderboardScreen players={players} currentPhase={currentPhase} timer={timer} />
+              <LeaderboardScreen
+                players={players}
+                currentPhase={currentPhase}
+                timer={timer}
+                onExpandTimer={() => setTimerMaximized(true)}
+              />
             </motion.div>
           )}
           {currentScreen === "tables" && (
@@ -262,7 +286,11 @@ export default function ScreenController() {
               transition={{ duration: 0.2 }}
               className="min-h-full sm:h-full"
             >
-              <TablesScreen tables={displayTables} timer={timer} />
+              <TablesScreen
+                tables={displayTables}
+                timer={timer}
+                onExpandTimer={() => setTimerMaximized(true)}
+              />
             </motion.div>
           )}
         </AnimatePresence>

@@ -10,6 +10,7 @@ import { TimerSnapshot } from '@/lib/timer';
 interface TablesScreenProps {
   tables: Table[];
   timer: TimerSnapshot | null;
+  onExpandTimer?: () => void;
 }
 
 function getTeamStyle(team: string) {
@@ -24,7 +25,7 @@ function pickRows(n: number) {
   return 7;
 }
 
-export default function TablesScreen({ tables, timer }: TablesScreenProps) {
+export default function TablesScreen({ tables, timer, onExpandTimer }: TablesScreenProps) {
   const realPlayerCount = tables.reduce(
     (acc, table) => acc + table.players.filter((player) => !player.isDummy).length,
     0
@@ -33,7 +34,7 @@ export default function TablesScreen({ tables, timer }: TablesScreenProps) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[#0a0a0b] p-2 sm:p-4">
-      <TournamentTimer timer={timer} />
+      <TournamentTimer timer={timer} onExpand={onExpandTimer} />
       {/* Header */}
       <header className="flex flex-wrap items-center justify-between gap-y-1 gap-x-3 mb-3 pb-2 border-b border-white/10">
         <div className="flex items-center gap-2 min-w-0">

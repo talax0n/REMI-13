@@ -198,6 +198,7 @@ export default function TableScoring({
   const currentTable = selectedTable
     ? tables.find((t) => t.number === selectedTable) ?? null
     : null;
+  const currentTablePlayers = currentTable?.players.filter((player) => !player.isDummy) ?? [];
 
   if (isLoading) {
     return (
@@ -354,7 +355,7 @@ export default function TableScoring({
         </Button>
         <div className="flex-1">
           <h2 className="text-xl font-bold text-white">Table {currentTable?.number}</h2>
-          <p className="text-sm text-zinc-500">{currentTable?.players.length} participants</p>
+          <p className="text-sm text-zinc-500">{currentTablePlayers.length} participants</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -384,7 +385,7 @@ export default function TableScoring({
 
       <div className="space-y-3">
         <AnimatePresence mode="popLayout">
-          {currentTable?.players.map((player: Player, index: number) => {
+          {currentTablePlayers.map((player: Player, index: number) => {
             const dbScore = playerScores.get(player.id) ?? player.score;
             const storedPhasePoints = getStoredPhasePoints(player.id);
             const pendingPhasePoints = scores[player.id];
@@ -404,8 +405,6 @@ export default function TableScoring({
               ? dbScore - (storedPhasePoints ?? 0) + (effectivePhasePoints ?? 0)
               : effectivePhasePoints ?? storedPhasePoints ?? 0;
             const teamStyle = getTeamStyle(player.team);
-            const isDummy = !!player.isDummy;
-
             return (
               <motion.div
                 key={player.id}
@@ -436,7 +435,7 @@ export default function TableScoring({
                       <h3 className="font-bold text-white truncate">{player.name}</h3>
                     </div>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${teamStyle.bg} ${teamStyle.text}`}>
-                      {isDummy ? 'Placeholder' : player.team}
+                      {player.team}
                     </span>
                     <div className="mt-2 flex items-center gap-2">
                       <span className="text-xs text-zinc-500">
@@ -461,7 +460,6 @@ export default function TableScoring({
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                           handleScoreChange(player.id, e.target.value)
                         }
-                        disabled={isDummy}
                         placeholder="0"
                         className="
                           w-20 h-10 bg-zinc-800/50 border-white/10

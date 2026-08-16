@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Minimize2, Play } from 'lucide-react';
+import { Minimize2, Pause, Play } from 'lucide-react';
 import { getRemainingTimerSeconds, TimerSnapshot } from '@/lib/timer';
 import { REMI13_RULES } from '@/lib/tournament-config';
 import { SuitPip } from './suit-pip';
@@ -23,38 +23,74 @@ function getSynchronizedRemaining(timer: TimerSnapshot | null): number {
   return getRemainingTimerSeconds(timer, Date.now() + serverOffset);
 }
 
-function timerKey(timer: TimerSnapshot | null): string | null {
-  if (!timer) return null;
-  return `${timer.phase}-${timer.kocokan}-${timer.startedAt ?? ''}`;
-}
-
-// Every fresh "start" (a new phase/kocokan/startedAt combination) takes over
-// the whole screen once, so the room notices a round just began. Whoever is
-// minding the display can dismiss it to get back to the live leaderboard or
-// tables underneath — the compact timer bar keeps running there regardless.
-export default function MaximizedTimerOverlay({ timer }: { timer: TimerSnapshot | null }) {
-  const [remaining, setRemaining] = useState(() => getSynchronizedRemaining(timer));
-  const [dismissedKey, setDismissedKey] = useState<string | null>(null);
+// Takes over the whole screen whenever the parent says to (a fresh start, or
+// the viewer manually re-opening it after closing). Whoever is minding the
+// display can close it to get back to the live leaderboard or tables
+// underneath — the compact timer bar keeps running there regardless, and
+// still has its own "maximize" button to bring this back.
+export default function MaximizedTimerOverlay({
+  timer,
+  visible,
+  onClose,
+}: {
+  timer: TimerSnapshot | null;
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const timerRef = useRef<TimerSnapshot | null>(timer);
+  const digitRef = useRef<HTMLDivElement>(null);
+  const ringRef = useRef<SVGCircleElement>(null);
+  const [isUrgent, setIsUrgent] = useState(false);
+  const urgentRef = useRef(false);
   const reduceMotion = useReducedMotion();
+  const [initialDisplay] = useState(() => formatTime(getSynchronizedRemaining(timer)));
+  const [initialDashOffset] = useState(() => {
+    const remaining = getSynchronizedRemaining(timer);
+    const fraction = timer && timer.durationSeconds > 0 ? Math.min(1, Math.max(0, remaining / timer.durationSeconds)) : 0;
+    return RING_CIRCUMFERENCE * (1 - fraction);
+  });
 
   useEffect(() => {
-    const tick = () => setRemaining(getSynchronizedRemaining(timer));
-    tick();
-    const id = window.setInterval(tick, 1000);
-    return () => window.clearInterval(id);
+    timerRef.current = timer;
   }, [timer]);
 
-  const key = timerKey(timer);
-  const isRunning = timer?.status === 'running' && remaining > 0;
-  const visible = Boolean(isRunning && key && key !== dismissedKey);
+  useEffect(() => {
+    // Write the digits and ring straight to the DOM instead of through React.
+    // The clock is derived from the absolute timestamp on every animation
+    // frame; API polling only replaces the base snapshot.
+    let frame = 0;
+    let lastRemaining = -1;
+    const tick = () => {
+      const current = timerRef.current;
+      const remaining = getSynchronizedRemaining(current);
 
-  const isUrgent = isRunning && remaining <= 60;
-  const fraction = timer && timer.durationSeconds > 0 ? Math.min(1, Math.max(0, remaining / timer.durationSeconds)) : 0;
-  const dashOffset = RING_CIRCUMFERENCE * (1 - fraction);
+      if (remaining !== lastRemaining) {
+        lastRemaining = remaining;
+        if (digitRef.current) digitRef.current.textContent = formatTime(remaining);
+        if (ringRef.current) {
+          const fraction = current && current.durationSeconds > 0 ? Math.min(1, Math.max(0, remaining / current.durationSeconds)) : 0;
+          ringRef.current.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - fraction));
+        }
+      }
+
+      const nextUrgent = current?.status === 'running' && remaining > 0 && remaining <= 60;
+      if (urgentRef.current !== nextUrgent) {
+        urgentRef.current = nextUrgent;
+        setIsUrgent(nextUrgent);
+      }
+      frame = window.requestAnimationFrame(tick);
+    };
+
+    tick();
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  const canShow = Boolean(timer && (timer.status === 'running' || timer.status === 'paused'));
+  const shown = visible && canShow;
 
   return (
     <AnimatePresence>
-      {visible && timer && (
+      {shown && timer && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -68,7 +104,7 @@ export default function MaximizedTimerOverlay({ timer }: { timer: TimerSnapshot 
         >
           <button
             type="button"
-            onClick={() => key && setDismissedKey(key)}
+            onClick={onClose}
             className="absolute right-4 top-4 inline-flex h-11 items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-4 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0b] sm:right-6 sm:top-6"
           >
             <Minimize2 className="h-4 w-4" />
@@ -84,6 +120,7 @@ export default function MaximizedTimerOverlay({ timer }: { timer: TimerSnapshot 
             <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90">
               <circle cx="50" cy="50" r={RING_RADIUS} className="fill-none stroke-white/[0.08]" strokeWidth="4" />
               <circle
+                ref={ringRef}
                 cx="50"
                 cy="50"
                 r={RING_RADIUS}
@@ -93,20 +130,29 @@ export default function MaximizedTimerOverlay({ timer }: { timer: TimerSnapshot 
                   reduceMotion ? '' : 'transition-[stroke-dashoffset] duration-1000 ease-linear'
                 }`}
                 strokeDasharray={RING_CIRCUMFERENCE}
-                strokeDashoffset={dashOffset}
+                strokeDashoffset={initialDashOffset}
               />
             </svg>
             <div
+              ref={digitRef}
               className={`font-[family-name:var(--font-space-grotesk)] text-6xl font-black tabular-nums tracking-tight sm:text-7xl ${
                 isUrgent ? 'text-rose-200' : 'text-white'
               }`}
             >
-              {formatTime(remaining)}
+              {initialDisplay}
             </div>
           </div>
 
           <p className={`mt-6 flex items-center gap-1.5 text-sm font-medium ${isUrgent ? 'text-rose-200' : 'text-amber-200/80'}`}>
-            <Play className="h-3.5 w-3.5" /> Sedang berjalan
+            {timer.status === 'paused' ? (
+              <>
+                <Pause className="h-3.5 w-3.5" /> Dijeda
+              </>
+            ) : (
+              <>
+                <Play className="h-3.5 w-3.5" /> Sedang berjalan
+              </>
+            )}
           </p>
         </motion.div>
       )}
