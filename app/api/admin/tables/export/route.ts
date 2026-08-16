@@ -11,7 +11,7 @@ interface TournamentStateRow {
 }
 
 const XLSX_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-const SCORE_SHEET_SHUFFLES = 7;
+const SCORE_SHEET_SHUFFLES = 6;
 
 function safeFilenamePart(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
